@@ -52,16 +52,17 @@ namespace GDI_CS {
 						break;
 					case 2:
 						if (timer % 2 == 0) {
-							//Payloads.Melt(random.Value!.Next(50, 500), random.Value!.Next(-10, 10), x, y);
+							Payloads.Melt(random.Value!.Next(50, 500), random.Value!.Next(-10, 10), x, y);
 						}
 						if (timer % 5 == 0) {
-							//Payloads.Invert(random.Value!.Next(x / 2), random.Value!.Next(y / 2), random.Value!.Next(x), random.Value!.Next(y));
+							Payloads.Invert(random.Value!.Next(x / 2), random.Value!.Next(y / 2), random.Value!.Next(x), random.Value!.Next(y));
 						}
 						if (timer % 15 == 0) {
-							//Payloads.Blur(random.Value!.Next(-2, 2), random.Value!.Next(-2, 2), x, y, 0, 0, x, y, x, y);
+							Payloads.Blur(random.Value!.Next(-2, 2), random.Value!.Next(-2, 2), x, y, 0, 0, x, y, x, y);
 						}
 						if (timer % 10 == 0) {
-							//Payloads.Tunnel((int)(x / 100), (int)(y / 100), true, true, x, y);
+							Payloads.Tunnel((int)(x / 100), (int)(y / 100), true, true, x, y);
+
 						}
 
 						break;

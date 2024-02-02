@@ -1,41 +1,79 @@
 ﻿using System.Text.RegularExpressions;
 using System;
 using System.Runtime.InteropServices;
+using System.Linq.Expressions;
 
 namespace GDI_CS {
-    internal class GDI {
+	internal class GDI {
 
-        private static ThreadLocal<Random> random = new ThreadLocal<Random>(() => new Random());
+		private static ThreadLocal<Random> random = new ThreadLocal<Random>(() => new Random());
 
-        [DllImport("user32.dll")]
-        public static extern int GetSystemMetrics(int nIndex);
+		[DllImport("user32.dll")]
+		public static extern int GetSystemMetrics(int nIndex);
 
-        [DllImport("user32.dll")]
-        private static extern bool SetProcessDPIAware();
+		[DllImport("user32.dll")]
+		private static extern bool SetProcessDPIAware();
 
-        static void Main(string[] args) {
+		public static void Exit() {
+			Environment.Exit(0);
+		}
 
-            Console.WriteLine("Hello, World!");
+		static void Main(string[] args) {
+			Console.WriteLine("Hello, World!");
 
-            SetProcessDPIAware();
+			SetProcessDPIAware();
 
-            int x = GetSystemMetrics(0);
-            int y = GetSystemMetrics(1);
+			int x = GetSystemMetrics(0);
+			int y = GetSystemMetrics(1);
+			int stage = 2;
 
-            int timer = 0;
-            while (true) {
-                if keyboard.is_pressed('esc') {
-                    Exit();
-                }
-                timer += 1;
+			int timer = 0;
 
-            }
+			while (true) {
+				timer += 1;
 
-            Payloads.Invert(random.Value.Next(x / 2), random.Value.Next(y / 2), random.Value.Next(x), random.Value.Next(y));
+				if (timer == 500) {
+					Exit();
+				}
 
+				switch (stage) {
+					case 0:
+						if (timer % 2 == 0) {
+							Payloads.Melt(random.Value!.Next(50, 500), random.Value!.Next(-10, 10), x, y);
+						}
+						if (timer % 200 == 0) {
+							Payloads.Tunnel((int)(x / 50), (int)(y / 50), false, false, x, y);
+						}
+						break;
+					case 1:
+						if (timer % 5 == 0) {
+							Payloads.Invert(random.Value!.Next(x / 2), random.Value!.Next(y / 2), random.Value!.Next(x), random.Value!.Next(y));
+						}
+						break;
+					case 2:
+						if (timer % 2 == 0) {
+							//Payloads.Melt(random.Value!.Next(50, 500), random.Value!.Next(-10, 10), x, y);
+						}
+						if (timer % 5 == 0) {
+							//Payloads.Invert(random.Value!.Next(x / 2), random.Value!.Next(y / 2), random.Value!.Next(x), random.Value!.Next(y));
+						}
+						if (timer % 15 == 0) {
+							//Payloads.Blur(random.Value!.Next(-2, 2), random.Value!.Next(-2, 2), x, y, 0, 0, x, y, x, y);
+						}
+						if (timer % 10 == 0) {
+							//Payloads.Tunnel((int)(x / 100), (int)(y / 100), true, true, x, y);
+						}
 
-        }
-    }
+						break;
+					case 3:
+						Exit();
+						break;
+					default:
+						break;
+				}
+			}
+		}
+	}
 }
 
 
@@ -110,7 +148,7 @@ namespace GDI_CS {
 //                    p.Invert(randrange(x//2), randrange(y//2), randrange(x), randrange(y))
 
 //                #if (timer % 15 == 0):
-//# p.Blur(randrange(-2, 2), randrange(-2, 2), x, y, 0, 0, x, y)
+//                  # p.Blur(randrange(-2, 2), randrange(-2, 2), x, y, 0, 0, x, y)
 
 //                if (timer % 10 == 0):
 //                    p.Tunnel(int(x/100), int(y/100), True, True)

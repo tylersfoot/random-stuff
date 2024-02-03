@@ -4,171 +4,211 @@ using System.Threading;
 using System.Drawing;
 using System.Xml.Linq;
 using System.Net.NetworkInformation;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
-public static class Payloads {
-	[DllImport("user32.dll")]
-	public static extern IntPtr GetDC(IntPtr hWnd);
+namespace GDI_CS {
+	public static class Payloads {
 
-	[DllImport("gdi32.dll")]
-	public static extern IntPtr CreateSolidBrush(uint crColor);
+		private static ThreadLocal<Random> random = new ThreadLocal<Random>(() => new Random());
 
-	[DllImport("gdi32.dll")]
-	public static extern IntPtr SelectObject(IntPtr hdc, IntPtr h);
+		public static void Invert(int xstart, int ystart, int w, int h) {
+			// inverts random rectangle of the screen with a random color filter applied
 
-	[DllImport("gdi32.dll")]
-	public static extern bool PatBlt(IntPtr hdc, int x, int y, int w, int h, uint rop);
+			IntPtr hdc = WinApi.GetDC(IntPtr.Zero); // get device context for screen
+			uint color = (uint)((random.Value!.Next(256) << 16) | (random.Value!.Next(256) << 8) | random.Value!.Next(256));
+			IntPtr brush = WinApi.CreateSolidBrush(color);
+			WinApi.SelectObject(hdc, brush);
+			WinApi.PatBlt(hdc, xstart, ystart, w, h, WinApi.PATINVERT);
+			WinApi.DeleteObject(brush);
+			WinApi.ReleaseDC(IntPtr.Zero, hdc);
+		}
 
-	[DllImport("gdi32.dll")]
-	public static extern bool BitBlt(IntPtr hdcDest, int xDest, int yDest, int wDest, int hDest, IntPtr hdcSrc, int xSrc, int ySrc, int Rop);
+		public static void Blur(int xdest, int ydest, int wdest, int hdest, int xsrc, int ysrc, int wsrc, int hsrc, int x, int y) {
+			// blurs the screen
+			// dest: where the blended image goes
+			// src:  the image that will be blended
 
-	[DllImport("gdi32.dll", EntryPoint = "GdiAlphaBlend")]
-	public static extern bool AlphaBlend(IntPtr hdcDest, int xDest, int yDest, int wDest, int hDest, IntPtr hdcSrc, int xSrc, int ySrc, int wSrc, int hSrc, BLENDFUNCTION blendFunction);
-
-	[DllImport("gdi32.dll", EntryPoint = "StretchBlt", SetLastError = true)]
-	[return: MarshalAs(UnmanagedType.Bool)]
-	public static extern bool StretchBlt(
-		IntPtr hdcDest,     // handle to destination DC
-		int nXOriginDest,   // x-coord of destination upper-left corner
-		int nYOriginDest,   // y-coord of destination upper-left corner
-		int nWidthDest,     // width of destination rectangle
-		int nHeightDest,    // height of destination rectangle
-		IntPtr hdcSrc,      // handle to source DC
-		int nXOriginSrc,    // x-coord of source upper-left corner
-		int nYOriginSrc,    // y-coord of source upper-left corner
-		int nWidthSrc,      // width of source rectangle
-		int nHeightSrc,     // height of source rectangle
-		uint dwRop          // raster operation code
-	);
-
-	[DllImport("gdi32.dll")]
-	public static extern bool DeleteObject(IntPtr hObject);
-
-	[DllImport("user32.dll")]
-	public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-
-	[DllImport("gdi32.dll")]
-	public static extern bool DeleteDC(IntPtr hdc);
-
-	[DllImport("gdi32.dll")]
-	public static extern void RGB(int red, int green, int blue);
-
-	[DllImport("gdi32.dll")]
-	public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-
-	[DllImport("gdi32.dll")]
-	public static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int nWidth, int nHeight);
-
-	[StructLayout(LayoutKind.Sequential)]
-	public struct BLENDFUNCTION {
-		public byte BlendOp;
-		public byte BlendFlags;
-		public byte SourceConstantAlpha;
-		public byte AlphaFormat;
-	}
-
-	private const uint PATINVERT = 0x005A0049;
-	const int SRCCOPY = 0x00CC0020;
-
-	private static ThreadLocal<Random> random = new ThreadLocal<Random>(() => new Random());
-
-	public static void Invert(int xstart, int ystart, int w, int h) {
-		// inverts random rectangle of the screen with a random color filter applied
-
-		IntPtr hdc = GetDC(IntPtr.Zero); // get device context for screen
-		uint color = (uint)((random.Value!.Next(256) << 16) | (random.Value!.Next(256) << 8) | random.Value!.Next(256));
-		IntPtr brush = CreateSolidBrush(color);
-		SelectObject(hdc, brush);
-		PatBlt(hdc, xstart, ystart, w, h, PATINVERT);
-		DeleteObject(brush);
-		ReleaseDC(IntPtr.Zero, hdc);
-	}
-
-	public static void Blur(int xdest, int ydest, int wdest, int hdest, int xsrc, int ysrc, int wsrc, int hsrc, int x, int y) {
-		// blurs the screen
-		// dest: where the blended image goes
-		// src:  the image that will be blended
-
-		IntPtr hdc = GetDC(IntPtr.Zero);
-		IntPtr mhdc = CreateCompatibleDC(hdc);
+			IntPtr hdc = WinApi.GetDC(IntPtr.Zero);
+			IntPtr mhdc = WinApi.CreateCompatibleDC(hdc);
 
 
-		IntPtr hbit = CreateCompatibleBitmap(hdc, x, y);
-		IntPtr holdbit = SelectObject(mhdc, hbit);
+			IntPtr hbit = WinApi.CreateCompatibleBitmap(hdc, x, y);
+			IntPtr holdbit = WinApi.SelectObject(mhdc, hbit);
+
+			WinApi.BitBlt(mhdc, 0, 0, x, y, hdc, 0, 0, WinApi.SRCCOPY);
+
+			WinApi.BLENDFUNCTION blendFunction = new WinApi.BLENDFUNCTION {
+				BlendOp = 0x00, // AC_SRC_OVER
+				BlendFlags = 0x00,
+				SourceConstantAlpha = 70, // Use a constant alpha value for blending (0-255)
+				AlphaFormat = 0x00 // AC_SRC_ALPHA
+			};
+
+			WinApi.AlphaBlend(hdc, xdest, ydest, wdest, hdest, mhdc, xsrc, ysrc, wsrc, hsrc, blendFunction);
+			WinApi.SelectObject(mhdc, holdbit);
+			WinApi.DeleteObject(holdbit);
+			WinApi.DeleteObject(hbit);
+			WinApi.DeleteDC(mhdc);
+			WinApi.ReleaseDC(IntPtr.Zero, hdc);
+		}
+
+		public static void Melt(int slicewidth, int vshift, int x, int y) {
+			// slicewidth: width of the slice
+			// vshift: where to shift the slice vertically
+
+			IntPtr hdc = WinApi.GetDC(IntPtr.Zero);
+			int r = random.Value!.Next(x);
 
 
-		BitBlt(mhdc, 0, 0, x, y, hdc, 0, 0, SRCCOPY);
+			WinApi.BitBlt(hdc, r, vshift, slicewidth, y, hdc, r, 0, WinApi.SRCCOPY);
+			WinApi.ReleaseDC(IntPtr.Zero, hdc);
+		}
 
-		BLENDFUNCTION blendFunction = new BLENDFUNCTION {
-			BlendOp = 0x00, // AC_SRC_OVER
-			BlendFlags = 0x00,
-			SourceConstantAlpha = 70, // Use a constant alpha value for blending (0-255)
-			AlphaFormat = 0x00 // AC_SRC_ALPHA
-		};
+		public static void Tunnel(int strength, int jiggle, bool invert, bool rainbow, int x, int y) {
+			// makes a tunnel effect on the screen - loop it
+			// strength: how deep the tunnel is
+			// jiggle: how much the tunnel moves around
+			// invert: inverts on each tunnel
+			// rainbow: adds random brush color
 
-		AlphaBlend(hdc, xdest, ydest, wdest, hdest, mhdc, xsrc, ysrc, wsrc, hsrc, blendFunction);
-		SelectObject(mhdc, holdbit);
-		DeleteObject(holdbit);
-		DeleteObject(hbit);
-		DeleteDC(mhdc);
-		ReleaseDC(IntPtr.Zero, hdc);
-	}
+			IntPtr hdc = WinApi.GetDC(IntPtr.Zero);
 
-	public static void Melt(int slicewidth, int vshift, int x, int y) {
-		// slicewidth: width of the slice
-		// vshift: where to shift the slice vertically
+			IntPtr mhdc = WinApi.CreateCompatibleDC(hdc);
 
-		IntPtr hdc = GetDC(IntPtr.Zero);
-		int r = random.Value!.Next(x);
+			IntPtr hbit = WinApi.CreateCompatibleBitmap(hdc, x, y);
 
+			WinApi.SelectObject(mhdc, hbit);
 
-		BitBlt(hdc, r, vshift, slicewidth, y, hdc, r, 0, SRCCOPY);
-		ReleaseDC(0, hdc);
-	}
+			if (invert) {
+				// invert hdc
+				WinApi.PatBlt(hdc, 0, 0, x, y, WinApi.PATINVERT);
 
-	public static void Tunnel(int strength, int jiggle, bool invert, bool rainbow, int x, int y) {
-		// makes a tunnel effect on the screen - loop it
-		// strength: how deep the tunnel is
-		// jiggle: how much the tunnel moves around
-		// invert: inverts on each tunnel
-		// rainbow: adds random brush color
+				if (rainbow) {
+					uint color = (uint)((random.Value!.Next(256) << 16) | (random.Value!.Next(256) << 8) | random.Value!.Next(256));
+					IntPtr brush = WinApi.CreateSolidBrush(color);
+					WinApi.SelectObject(hdc, brush);
+				}
 
-		IntPtr hdc = GetDC(IntPtr.Zero);
-
-		IntPtr mhdc = CreateCompatibleDC(hdc);
-
-		IntPtr hbit = CreateCompatibleBitmap(hdc, x, y);
-
-		SelectObject(mhdc, hbit);
-
-		if (invert) {
-			// invert hdc
-			PatBlt(hdc, 0, 0, x, y, PATINVERT);
-
-			if (rainbow) {
-				uint color = (uint)((random.Value!.Next(256) << 16) | (random.Value!.Next(256) << 8) | random.Value!.Next(256));
-				IntPtr brush = CreateSolidBrush(color);
-				SelectObject(hdc, brush);
+				// copy hdc to mhdc
+				WinApi.BitBlt(mhdc, 0, 0, x, y, hdc, 0, 0, WinApi.SRCCOPY);
+				// invert hdc
+				WinApi.PatBlt(hdc, 0, 0, x, y, WinApi.PATINVERT);
+			}
+			else {
+				// copy hdc to mhdc
+				WinApi.BitBlt(mhdc, 0, 0, x, y, hdc, 0, 0, WinApi.SRCCOPY);
 			}
 
-			// copy hdc to mhdc
-			BitBlt(mhdc, 0, 0, x, y, hdc, 0, 0, SRCCOPY);
-			// invert hdc
-			PatBlt(hdc, 0, 0, x, y, PATINVERT);
+			// copy mhdc onto hdc but smaller
+			WinApi.StretchBlt(hdc, strength + random.Value!.Next(-jiggle, jiggle),
+				strength + random.Value!.Next(-jiggle, jiggle),
+				x - (strength * 2), y - (strength * 2),
+				mhdc, 0, 0, x, y, WinApi.SRCCOPY);
+			WinApi.DeleteObject(hbit);
+
+			WinApi.DeleteDC(mhdc);
+
+			WinApi.ReleaseDC(IntPtr.Zero, hdc);
 		}
-		else {
-			// copy hdc to mhdc
-			BitBlt(mhdc, 0, 0, x, y, hdc, 0, 0, SRCCOPY);
+
+		public static void Pixellize(int size, int x, int y) {
+			// pixellizes the screen
+			// size: size of pixels
+
+			IntPtr hdc = WinApi.GetDC(IntPtr.Zero);
+
+			IntPtr mhdc = WinApi.CreateCompatibleDC(hdc);
+
+			IntPtr hbit = WinApi.CreateCompatibleBitmap(hdc, x, y);
+
+			WinApi.SelectObject(mhdc, hbit);
+
+			WinApi.BitBlt(mhdc, 0, 0, x, y, hdc, 0, 0, WinApi.SRCCOPY);
+
+			// cut the image and stretch it back to size
+			WinApi.StretchBlt(hdc, 0, 0, x, y, mhdc, 0, 0, x / size, y / size, WinApi.SRCCOPY);
+
+			WinApi.DeleteObject(hbit);
+			WinApi.DeleteDC(mhdc);
+			WinApi.ReleaseDC(IntPtr.Zero, hdc);
 		}
 
-		// copy mhdc onto hdc but smaller
-		StretchBlt(hdc, strength + random.Value!.Next(-jiggle, jiggle), 
-			strength + random.Value!.Next(-jiggle, jiggle), 
-			x - (strength * 2), y - (strength * 2), 
-			mhdc, 0, 0, x, y, SRCCOPY);
-		DeleteObject(hbit);
+		public static void DrawError(bool cursor, bool error, int x, int y) {
+			// draws error icons on screen
+			// cursor: draws at cursor, else randomly
+			// error: use error icon, else warning icon
+			IntPtr hdc = WinApi.GetDC(IntPtr.Zero);
 
-		DeleteDC(mhdc);
+			if (cursor) {
+				WinApi.POINT cursorPos;
+				if (WinApi.GetCursorPos(out cursorPos)) {
+					if (error) {
+						WinApi.DrawIcon(hdc, cursorPos.X, cursorPos.Y, Data.IconError);
+					}
+					else {
+						WinApi.DrawIcon(hdc, cursorPos.X, cursorPos.Y, Data.IconError);
+					}
+				}
+			}
+			else {
 
-		ReleaseDC(0, hdc);
+				if (error) {
+					WinApi.DrawIcon(hdc, random.Value!.Next(x), random.Value!.Next(y), Data.IconError);
+				}
+				else {
+					WinApi.DrawIcon(hdc, random.Value!.Next(x), random.Value!.Next(y), Data.IconWarning);
+				}
+			}
+		}
+
+		public static void Puzzle(int size, int x, int y) {
+			// puzzles up the screen
+			// size: size of the blocks
+			IntPtr hdc = WinApi.GetDC(IntPtr.Zero);
+
+			int x1 = random.Value!.Next(x - 100);
+			int y1 = random.Value!.Next(y - 100);
+			int x2 = random.Value!.Next(x - 100);
+			int y2 = random.Value!.Next(y - 100);
+
+			int width = random.Value!.Next(size);
+			int height = random.Value!.Next(size);
+
+			WinApi.BitBlt(hdc, x1, y1, width, height, hdc, x2, y2, WinApi.SRCCOPY);
+		}
+
+
+		public static void Rotate(int amount, int xoffset, int yoffset, int w, int h, int x, int y) {
+			// rotates the screen
+			// amount: amount the screen rotates
+			IntPtr hdc = WinApi.GetDC(IntPtr.Zero);
+
+			IntPtr mhdc = WinApi.CreateCompatibleDC(hdc);
+
+			IntPtr hbit = WinApi.CreateCompatibleBitmap(hdc, x, y);
+
+			WinApi.SelectObject(mhdc, hbit);
+
+			WinApi.POINT[] points = new WinApi.POINT[] {
+			new WinApi.POINT(amount, -amount),
+			new WinApi.POINT(x + amount, amount),
+			new WinApi.POINT(-amount, y - amount)
+			};
+
+			WinApi.PlgBlt(hdc, points, hdc, -xoffset, -yoffset, x + w, y + h, IntPtr.Zero, 0, 0);
+
+			WinApi.DeleteObject(hbit);
+
+			WinApi.DeleteDC(mhdc);
+
+			WinApi.ReleaseDC(IntPtr.Zero, hdc);
+		}
+
+		//public static void ReverseText() {
+		//	// check for all open windows
+		//	IntPtr desktopHandle = WinApi.GetDesktopWindow();
+		//	// enumerate through all open windows and call reverse text function
+		//	WinApi.EnumChildWindows(desktopHandle, WinApi.ChildWindowCallback, IntPtr.Zero);
+		//}
 	}
 }

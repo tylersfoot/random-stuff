@@ -28,12 +28,12 @@ namespace GDI_CS {
 		}
 
 		public static void Music() {
-			var player = new ByteBeatPlayer(8000); // 8000 Hz sample rate
+			var player = new ByteBeatPlayer(8000, 5); // 8000 Hz sample rate
 
 			// Generate buffers
-			player.GenerateBuffer("(t * (t >> 9) * (t >> 11)) % 127", 16);
-			player.GenerateBuffer("(t * (t >> 9) * (t >> 8) & (t >> 4)) % 127", 16);
-			player.GenerateBuffer("(t * (t >> 5) * (t >> 8)) >> 3", 16);
+			player.GenerateBuffer("1");
+			player.GenerateBuffer("2");
+			player.GenerateBuffer("3");
 
 			while (true) {
 				if (playAudio) {
@@ -56,8 +56,6 @@ namespace GDI_CS {
 		}
 
 		static void Main(string[] args) {
-			Console.WriteLine("Hello, World!");
-
 			WinApi.SetProcessDPIAware();
 
 			int x = WinApi.GetSystemMetrics(0);
@@ -79,10 +77,6 @@ namespace GDI_CS {
 			while (true) {
 				timer += 1;
 
-				//if (timer == 400) {
-				//	Exit();
-				//}
-
 				switch (stage) {
 					case 0:
 						if (timer % 2 == 0) {
@@ -96,6 +90,9 @@ namespace GDI_CS {
 						}
 						if (timer % 200 == 50) {
 							Payloads.DrawError(true, true, x, y);
+						}
+						if (timer % 500 == 0) {
+							Payloads.OpenSite();
 						}
 						break;
 					case 1:
@@ -111,30 +108,36 @@ namespace GDI_CS {
 						if (timer % 30 == 15) {
 							Payloads.DrawError(true, true, x, y);
 						}
+						if (timer % 150 == 0) {
+							Payloads.OpenSite();
+						}
 						break;
 					case 2:
-						//if (timer % 2 == 0) {
-						//	Payloads.Melt(random.Value!.Next(50, 500), random.Value!.Next(-10, 10), x, y);
-						//}
-						//if (timer % 5 == 0) {
-						//	Payloads.Invert(random.Value!.Next(x / 2), random.Value!.Next(y / 2), random.Value!.Next(x), random.Value!.Next(y));
-						//}
-						//if (timer % 15 == 0) {
-						//	Payloads.Blur(random.Value!.Next(-2, 2), random.Value!.Next(-2, 2), x, y, 0, 0, x, y, x, y);
-						//}
-						//if (timer % 10 == 0) {
-						//	Payloads.Tunnel((int)(x / 100), (int)(y / 100), true, true, x, y);
-						//}
-						//if (timer % 1 == 0) {
-						//	Payloads.DrawError(false, false, x, y);
-						//	Payloads.DrawError(true, true, x, y);
-						//}
-						//if (timer % 1 == 0) {
-						//	Payloads.Puzzle(500, x, y);
-						//}
-						//if (timer % 5 == 0) {
-						//	Payloads.Rotate(random.Value!.Next(-100, 100), (int)(x / 100), (int)(y / 100), (int)(x / 50), (int)(y / 50), x, y);
-						//}
+						if (timer % 2 == 0) {
+							Payloads.Melt(random.Value!.Next(50, 500), random.Value!.Next(-10, 10), x, y);
+						}
+						if (timer % 5 == 0) {
+							Payloads.Invert(random.Value!.Next(x / 2), random.Value!.Next(y / 2), random.Value!.Next(x), random.Value!.Next(y));
+						}
+						if (timer % 15 == 0) {
+							Payloads.Blur(random.Value!.Next(-2, 2), random.Value!.Next(-2, 2), x, y, 0, 0, x, y, x, y);
+						}
+						if (timer % 10 == 0) {
+							Payloads.Tunnel((int)(x / 100), (int)(y / 100), true, true, x, y);
+						}
+						if (timer % 1 == 0) {
+							Payloads.DrawError(false, false, x, y);
+							Payloads.DrawError(true, true, x, y);
+						}
+						if (timer % 1 == 0) {
+							Payloads.Puzzle(500, x, y);
+						}
+						if (timer % 5 == 0) {
+							Payloads.Rotate(random.Value!.Next(-100, 100), (int)(x / 100), (int)(y / 100), (int)(x / 50), (int)(y / 50), x, y);
+						}
+						if (timer % 20 == 0) {
+							Payloads.OpenSite();
+						}
 						break;
 					case 3:
 						Exit();

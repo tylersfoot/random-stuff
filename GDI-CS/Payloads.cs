@@ -4,6 +4,7 @@ using System.Threading;
 using System.Drawing;
 using System.Xml.Linq;
 using System.Net.NetworkInformation;
+using System.Diagnostics;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace GDI_CS {
@@ -202,6 +203,25 @@ namespace GDI_CS {
 			WinApi.DeleteDC(mhdc);
 
 			WinApi.ReleaseDC(IntPtr.Zero, hdc);
+		}
+
+		public static void OpenSite() {
+			int index = random.Value!.Next(Data.sites.Count); // Generates a random index
+			string itemToOpen = Data.sites[index];
+
+			try {
+				if (itemToOpen.StartsWith("http")) {
+					// Open URL in default browser
+					Process.Start(new ProcessStartInfo(itemToOpen) { UseShellExecute = true });
+				}
+				else {
+					// Open system utility
+					Process.Start(itemToOpen);
+				}
+			}
+			catch (Exception ex) {
+				Console.WriteLine($"Error opening item: {ex.Message}");
+			}
 		}
 
 		//public static void ReverseText() {

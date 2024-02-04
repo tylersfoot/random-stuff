@@ -28,7 +28,7 @@ namespace GDI_CS {
 		}
 
 		public static void Music() {
-			var player = new ByteBeatPlayer(8000, 5); // 8000 Hz sample rate
+			var player = new ByteBeatPlayer(8000, 16); // 8000 Hz sample rate
 
 			// Generate buffers
 			player.GenerateBuffer("1");
@@ -92,7 +92,7 @@ namespace GDI_CS {
 							Payloads.DrawError(true, true, x, y);
 						}
 						if (timer % 500 == 0) {
-							Payloads.OpenSite();
+							//Payloads.OpenSite();
 						}
 						break;
 					case 1:
@@ -109,7 +109,7 @@ namespace GDI_CS {
 							Payloads.DrawError(true, true, x, y);
 						}
 						if (timer % 150 == 0) {
-							Payloads.OpenSite();
+							//Payloads.OpenSite();
 						}
 						break;
 					case 2:
@@ -136,7 +136,7 @@ namespace GDI_CS {
 							Payloads.Rotate(random.Value!.Next(-100, 100), (int)(x / 100), (int)(y / 100), (int)(x / 50), (int)(y / 50), x, y);
 						}
 						if (timer % 20 == 0) {
-							Payloads.OpenSite();
+							//Payloads.OpenSite();
 						}
 						break;
 					case 3:

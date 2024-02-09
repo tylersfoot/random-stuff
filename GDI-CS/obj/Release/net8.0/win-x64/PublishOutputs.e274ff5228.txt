@@ -1,0 +1,2 @@
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\win-x64\GDI-CS.pdb
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\win-x64\GDI-CS.exe

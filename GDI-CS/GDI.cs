@@ -14,14 +14,14 @@ namespace GDI_CS {
 			Environment.Exit(0);
 		}
 		public static void Warning() {
-			if (WinApi.MessageBox(IntPtr.Zero, "Do you want free robux???? :3",
-				"Free Robux!", // The title of the warning.
+			if (WinApi.MessageBox(IntPtr.Zero, "Do you want free roblox tix???? :3",
+				"Free Tix!", // The title of the warning.
 				WinApi.MB_YESNO | WinApi.MB_ICONWARNING) == WinApi.IDNO) {
 				Exit();
 			}
 			Time.Sleep(1);
 			if (WinApi.MessageBox(IntPtr.Zero, "Are you suuree?????",
-				"Free Robux Forever!", // The title of the warning.
+				"Free Tix Forever!", // The title of the warning.
 				WinApi.MB_YESNO | WinApi.MB_ICONWARNING) == WinApi.IDNO) {
 				Exit();
 			}

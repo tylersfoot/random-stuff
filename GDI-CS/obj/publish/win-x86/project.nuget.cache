@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "dgSpecHash": "2kwtvnEHB3lJb2r0F37uRV6pz41MWZQ4z5iKLPnrhPeZPfl65D3vGGzsjkjH8IUimG56qjRQvTA86PQzmHa4UQ==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\tylersfoot\\Desktop\\Github\\random-stuff\\GDI-CS\\GDI-CS.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\microsoft.netcore.platforms\\3.1.0\\microsoft.netcore.platforms.3.1.0.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\microsoft.win32.registry\\4.7.0\\microsoft.win32.registry.4.7.0.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\naudio\\2.2.1\\naudio.2.2.1.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\naudio.asio\\2.2.1\\naudio.asio.2.2.1.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\naudio.core\\2.2.1\\naudio.core.2.2.1.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\naudio.midi\\2.2.1\\naudio.midi.2.2.1.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\naudio.wasapi\\2.2.1\\naudio.wasapi.2.2.1.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\naudio.winmm\\2.2.1\\naudio.winmm.2.2.1.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\system.security.accesscontrol\\4.7.0\\system.security.accesscontrol.4.7.0.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\system.security.principal.windows\\4.7.0\\system.security.principal.windows.4.7.0.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x86\\8.0.1\\microsoft.netcore.app.runtime.win-x86.8.0.1.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x86\\8.0.1\\microsoft.windowsdesktop.app.runtime.win-x86.8.0.1.nupkg.sha512",
+    "C:\\Users\\tylersfoot\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x86\\8.0.1\\microsoft.aspnetcore.app.runtime.win-x86.8.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}

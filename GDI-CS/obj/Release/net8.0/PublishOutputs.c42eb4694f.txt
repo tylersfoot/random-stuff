@@ -1,0 +1,11 @@
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\GDI-CS.exe
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\GDI-CS.dll
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\GDI-CS.deps.json
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\GDI-CS.runtimeconfig.json
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\GDI-CS.pdb
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\NAudio.dll
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\NAudio.Asio.dll
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\NAudio.Core.dll
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\NAudio.Midi.dll
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\NAudio.Wasapi.dll
+C:\Users\tylersfoot\Desktop\Github\random-stuff\GDI-CS\bin\Release\net8.0\publish\NAudio.WinMM.dll

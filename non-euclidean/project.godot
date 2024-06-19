@@ -25,6 +25,7 @@ SimpleGrass="*res://addons/simplegrasstextured/singleton.tscn"
 window/size/viewport_width=1600
 window/size/viewport_height=1000
 window/subwindows/embed_subwindows=false
+window/vsync/vsync_mode=0
 
 [dotnet]
 
@@ -68,7 +69,6 @@ jump={
 
 [rendering]
 
-renderer/rendering_method="gl_compatibility"
 viewport/transparent_background=true
 
 [shader_globals]

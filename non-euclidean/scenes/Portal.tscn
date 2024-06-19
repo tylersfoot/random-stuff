@@ -1,0 +1,54 @@
+[gd_scene load_steps=8 format=3 uid="uid://cydoqyj3fxncn"]
+
+[ext_resource type="Script" path="res://scripts/Portal.gd" id="1_4j86l"]
+[ext_resource type="Script" path="res://scripts/viewportmesh.gd" id="1_tou20"]
+[ext_resource type="Shader" path="res://scripts/Portal.gdshader" id="2_fsvlu"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_sj70a"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ojqr3"]
+resource_local_to_scene = true
+render_priority = 0
+shader = ExtResource("2_fsvlu")
+shader_parameter/albedo = Color(1, 1, 1, 1)
+shader_parameter/specular = 0.5
+shader_parameter/metallic = 0.0
+shader_parameter/roughness = 1.0
+shader_parameter/point_size = 1.0
+shader_parameter/uv1_scale = Vector3(1, 1, 1)
+shader_parameter/uv1_offset = Vector3(0, 0, 0)
+shader_parameter/uv2_scale = Vector3(1, 1, 1)
+shader_parameter/uv2_offset = Vector3(0, 0, 0)
+shader_parameter/texture_albedo = SubResource("ViewportTexture_sj70a")
+
+[sub_resource type="QuadMesh" id="QuadMesh_kc5ts"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1lbnc"]
+size = Vector3(1, 1, 0.2)
+
+[node name="Portal" type="Node3D"]
+script = ExtResource("1_4j86l")
+
+[node name="SubViewport" type="SubViewport" parent="."]
+size = Vector2i(1152, 648)
+render_target_update_mode = 4
+
+[node name="Camera3D" type="Camera3D" parent="SubViewport"]
+cull_mask = 983039
+current = true
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
+material_override = SubResource("ShaderMaterial_ojqr3")
+mesh = SubResource("QuadMesh_kc5ts")
+script = ExtResource("1_tou20")
+
+[node name="VisibilityNotifier" type="VisibleOnScreenNotifier3D" parent="."]
+visible = false
+
+[node name="Area3D" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.1)
+shape = SubResource("BoxShape3D_1lbnc")

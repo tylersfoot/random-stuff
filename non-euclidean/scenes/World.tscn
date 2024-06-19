@@ -1,9 +1,8 @@
-[gd_scene load_steps=25 format=3 uid="uid://cys12thfntdpv"]
+[gd_scene load_steps=17 format=3 uid="uid://cys12thfntdpv"]
 
 [ext_resource type="PackedScene" uid="uid://c6ox74rcx7tcf" path="res://scenes/Player.tscn" id="1_bqdxf"]
 [ext_resource type="Script" path="res://scripts/World.gd" id="1_yjypi"]
-[ext_resource type="Texture2D" uid="uid://heyokmr5bcho" path="res://assets/images/prototype.png" id="3_dxxuu"]
-[ext_resource type="Texture2D" uid="uid://07so3f7845t0" path="res://assets/images/rock.jpg" id="4_c5s1x"]
+[ext_resource type="Material" uid="uid://cg0u0b2hvwcq7" path="res://assets/materials/Checker.tres" id="3_sns12"]
 [ext_resource type="PackedScene" uid="uid://cydoqyj3fxncn" path="res://scenes/Portal.tscn" id="7_2518q"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_esuhq"]
@@ -11,27 +10,14 @@
 [sub_resource type="BoxShape3D" id="BoxShape3D_ttr8s"]
 size = Vector3(10, 2, 10)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5avwg"]
-albedo_texture = ExtResource("3_dxxuu")
-metallic_specular = 0.0
-uv1_triplanar = true
-uv1_world_triplanar = true
-
 [sub_resource type="BoxMesh" id="BoxMesh_2cti4"]
-material = SubResource("StandardMaterial3D_5avwg")
+material = ExtResource("3_sns12")
 size = Vector3(10, 2, 10)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_7igj1"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_in6bn"]
-albedo_texture = ExtResource("4_c5s1x")
-albedo_texture_force_srgb = true
-clearcoat_roughness = 0.0
-ao_enabled = true
-ao_light_affect = 1.0
-
 [sub_resource type="BoxMesh" id="BoxMesh_7pe8e"]
-material = SubResource("StandardMaterial3D_in6bn")
+material = ExtResource("3_sns12")
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_lc6ua"]
 
@@ -50,148 +36,26 @@ ao_light_affect = 1.0
 [sub_resource type="BoxMesh" id="BoxMesh_4dk32"]
 material = SubResource("StandardMaterial3D_1d5p7")
 
-[sub_resource type="Shader" id="Shader_aifsp"]
-code = "
-// NOTE: Shader automatically converted from Godot Engine 4.2.2.stable.mono's ProceduralSkyMaterial.
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_bvfrq"]
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
 
-shader_type sky;
-render_mode use_debanding;
-
-uniform vec4 sky_top_color : source_color = vec4(0.385, 0.454, 0.55, 1.0);
-uniform vec4 sky_horizon_color : source_color = vec4(0.646, 0.656, 0.67, 1.0);
-uniform float sky_curve : hint_range(0, 1) = 0.15;
-uniform float sky_energy = 1.0; // In Lux.
-uniform sampler2D sky_cover : filter_linear, source_color, hint_default_black;
-uniform vec4 sky_cover_modulate : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-uniform vec4 ground_bottom_color : source_color = vec4(0.2, 0.169, 0.133, 1.0);
-uniform vec4 ground_horizon_color : source_color = vec4(0.646, 0.656, 0.67, 1.0);
-uniform float ground_curve : hint_range(0, 1) = 0.02;
-uniform float ground_energy = 1.0;
-uniform float sun_angle_max = 30.0;
-uniform float sun_curve : hint_range(0, 1) = 0.15;
-
-uniform sampler2D cloud_texture;
-uniform sampler2D cloud_texture2;
-uniform vec2 cloud_direction;
-uniform vec2 cloud_direction2;
-uniform vec2 cloud_scale;
-uniform float cloud_distance;
-uniform float cloud_speed;
-uniform float cloud_speed2;
-
-void sky() {
-	float v_angle = acos(clamp(EYEDIR.y, -1.0, 1.0));
-	float c = (1.0 - v_angle / (PI * 0.5));
-	vec3 sky = mix(sky_horizon_color.rgb, sky_top_color.rgb, clamp(1.0 - pow(1.0 - c, 1.0 / sky_curve), 0.0, 1.0));
-	sky *= sky_energy;
-
-	if (LIGHT0_ENABLED) {
-		float sun_angle = acos(dot(LIGHT0_DIRECTION, EYEDIR));
-		if (sun_angle < LIGHT0_SIZE) {
-			sky = LIGHT0_COLOR * LIGHT0_ENERGY;
-		} else if (sun_angle < sun_angle_max) {
-			float c2 = (sun_angle - LIGHT0_SIZE) / (sun_angle_max - LIGHT0_SIZE);
-			sky = mix(LIGHT0_COLOR * LIGHT0_ENERGY, sky, clamp(1.0 - pow(1.0 - c2, 1.0 / sun_curve), 0.0, 1.0));
-		}
-	}
-
-	if (LIGHT1_ENABLED) {
-		float sun_angle = acos(dot(LIGHT1_DIRECTION, EYEDIR));
-		if (sun_angle < LIGHT1_SIZE) {
-			sky = LIGHT1_COLOR * LIGHT1_ENERGY;
-		} else if (sun_angle < sun_angle_max) {
-			float c2 = (sun_angle - LIGHT1_SIZE) / (sun_angle_max - LIGHT1_SIZE);
-			sky = mix(LIGHT1_COLOR * LIGHT1_ENERGY, sky, clamp(1.0 - pow(1.0 - c2, 1.0 / sun_curve), 0.0, 1.0));
-		}
-	}
-
-	if (LIGHT2_ENABLED) {
-		float sun_angle = acos(dot(LIGHT2_DIRECTION, EYEDIR));
-		if (sun_angle < LIGHT2_SIZE) {
-			sky = LIGHT2_COLOR * LIGHT2_ENERGY;
-		} else if (sun_angle < sun_angle_max) {
-			float c2 = (sun_angle - LIGHT2_SIZE) / (sun_angle_max - LIGHT2_SIZE);
-			sky = mix(LIGHT2_COLOR * LIGHT2_ENERGY, sky, clamp(1.0 - pow(1.0 - c2, 1.0 / sun_curve), 0.0, 1.0));
-		}
-	}
-
-	if (LIGHT3_ENABLED) {
-		float sun_angle = acos(dot(LIGHT3_DIRECTION, EYEDIR));
-		if (sun_angle < LIGHT3_SIZE) {
-			sky = LIGHT3_COLOR * LIGHT3_ENERGY;
-		} else if (sun_angle < sun_angle_max) {
-			float c2 = (sun_angle - LIGHT3_SIZE) / (sun_angle_max - LIGHT3_SIZE);
-			sky = mix(LIGHT3_COLOR * LIGHT3_ENERGY, sky, clamp(1.0 - pow(1.0 - c2, 1.0 / sun_curve), 0.0, 1.0));
-		}
-	}
-
-	vec4 sky_cover_texture = texture(sky_cover, SKY_COORDS);
-	sky += (sky_cover_texture.rgb * sky_cover_modulate.rgb) * sky_cover_texture.a * sky_cover_modulate.a * sky_energy;
-
-	c = (v_angle - (PI * 0.5)) / (PI * 0.5);
-	vec3 ground = mix(ground_horizon_color.rgb, ground_bottom_color.rgb, clamp(1.0 - pow(1.0 - c, 1.0 / ground_curve), 0.0, 1.0));
-	ground *= ground_energy;
-
-	vec2 sky_uv = EYEDIR.xz / EYEDIR.y;
-	vec3 clouds = texture(cloud_texture, sky_uv * cloud_scale + TIME * cloud_direction * cloud_speed).rgb - texture(cloud_texture2, sky_uv * cloud_scale + TIME * cloud_direction2 * cloud_speed2).rgb;
-	clouds = clouds - smoothstep(0.0, EYEDIR.y, cloud_distance);
-	clouds = clamp(clouds, 0.0, 1.0); 
-	sky += clouds;
-
-	COLOR = mix(ground, sky, step(0.0, EYEDIR.y));
-}
-"
-
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_g5nr6"]
-noise_type = 0
-seed = 1
-domain_warp_type = 2
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_tsvu2"]
-width = 2048
-height = 2048
-seamless = true
-noise = SubResource("FastNoiseLite_g5nr6")
-
-[sub_resource type="FastNoiseLite" id="FastNoiseLite_olbrk"]
-
-[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_hx55k"]
-width = 2048
-height = 2048
-seamless = true
-noise = SubResource("FastNoiseLite_olbrk")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_lec4b"]
-shader = SubResource("Shader_aifsp")
-shader_parameter/sky_top_color = Color(0.260303, 0.645016, 0.973285, 1)
-shader_parameter/sky_horizon_color = Color(0.701961, 0.819608, 0.866667, 1)
-shader_parameter/sky_curve = 0.15
-shader_parameter/sky_energy = 1.0
-shader_parameter/sky_cover_modulate = Color(1, 1, 1, 1)
-shader_parameter/ground_bottom_color = Color(0.435294, 0.721569, 0.882353, 1)
-shader_parameter/ground_horizon_color = Color(0.701961, 0.819608, 0.866667, 1)
-shader_parameter/ground_curve = 0.02
-shader_parameter/ground_energy = 1.0
-shader_parameter/sun_angle_max = 0.523599
-shader_parameter/sun_curve = 0.15
-shader_parameter/cloud_direction = Vector2(-1, 1)
-shader_parameter/cloud_direction2 = Vector2(1, -1)
-shader_parameter/cloud_scale = Vector2(0.02, 0.02)
-shader_parameter/cloud_distance = 0.04
-shader_parameter/cloud_speed = 0.001
-shader_parameter/cloud_speed2 = 0.002
-shader_parameter/cloud_texture = SubResource("NoiseTexture2D_tsvu2")
-shader_parameter/cloud_texture2 = SubResource("NoiseTexture2D_hx55k")
-
-[sub_resource type="Sky" id="Sky_wvl81"]
-sky_material = SubResource("ShaderMaterial_lec4b")
+[sub_resource type="Sky" id="Sky_nr8k0"]
+sky_material = SubResource("ProceduralSkyMaterial_bvfrq")
 
 [sub_resource type="Environment" id="Environment_52ww7"]
 background_mode = 2
-background_energy_multiplier = 0.52
-sky = SubResource("Sky_wvl81")
+sky = SubResource("Sky_nr8k0")
 ambient_light_color = Color(1, 1, 1, 1)
 ambient_light_sky_contribution = 0.0
+tonemap_mode = 2
+tonemap_exposure = 0.9
+tonemap_white = 1.2
+sdfgi_enabled = true
+glow_enabled = true
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.005
+volumetric_fog_emission = Color(0.607843, 0.870588, 0.992157, 1)
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_yjypi")
@@ -337,25 +201,26 @@ distance_fade_begin = 0.0
 omni_range = 26.582
 
 [node name="Portal1" parent="." instance=ExtResource("7_2518q")]
-transform = Transform3D(1.6, 0, 0, 0, 3.2, 0, 0, 0, 1.6, 1.61422, 0.205, 7.11208)
+transform = Transform3D(2, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0.5, 9.75)
 player_node_path = NodePath("../Player")
 outbound_portal_path = NodePath("../Portal2")
 
 [node name="Portal1Frame" type="Node3D" parent="."]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 1.61422, 0, 7.14888)
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 9.75)
 
 [node name="FrameWall1" type="StaticBody3D" parent="Portal1Frame"]
-transform = Transform3D(0.2, 0, 0, 0, 2.2, 0, 0, 0, 0.2, 0.5, 0, 0)
+transform = Transform3D(0.25, 0, 0, 0, 1.75, 0, 0, 0, 0.25, 0.625, 0.375, 0)
 physics_material_override = SubResource("PhysicsMaterial_esuhq")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Portal1Frame/FrameWall1"]
 shape = SubResource("BoxShape3D_7igj1")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Portal1Frame/FrameWall1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("BoxMesh_7pe8e")
 
 [node name="FrameWall2" type="StaticBody3D" parent="Portal1Frame"]
-transform = Transform3D(0.2, 0, 0, 0, 2.2, 0, 0, 0, 0.2, -0.5, 0, 0)
+transform = Transform3D(0.25, 0, 0, 0, 1.75, 0, 0, 0, 0.25, -0.625, 0.375, 0)
 physics_material_override = SubResource("PhysicsMaterial_esuhq")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Portal1Frame/FrameWall2"]
@@ -365,7 +230,7 @@ shape = SubResource("BoxShape3D_7igj1")
 mesh = SubResource("BoxMesh_7pe8e")
 
 [node name="FrameTop" type="StaticBody3D" parent="Portal1Frame"]
-transform = Transform3D(-8.74228e-09, -1, 0, 0.2, -4.37114e-08, 0, 0, 0, 0.19, -0.001, 1, 0)
+transform = Transform3D(-1.09278e-08, -1, 0, 0.25, -4.37114e-08, 0, 0, 0, 0.25, 0, 1.125, 0)
 physics_material_override = SubResource("PhysicsMaterial_esuhq")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Portal1Frame/FrameTop"]
@@ -375,25 +240,26 @@ shape = SubResource("BoxShape3D_7igj1")
 mesh = SubResource("BoxMesh_7pe8e")
 
 [node name="Portal2" parent="." instance=ExtResource("7_2518q")]
-transform = Transform3D(-6.99382e-08, 0, 1.6, 0, 3.2, 0, -1.6, 0, -6.99382e-08, 5.10504, 0.209519, 2.15451)
+transform = Transform3D(-8.74228e-08, 0, 1, 0, 3, 0, -2, 0, -4.37114e-08, 8.25, 0.5, 0.5)
 player_node_path = NodePath("../Player")
 outbound_portal_path = NodePath("../Portal1")
 
 [node name="Portal2Frame" type="Node3D" parent="."]
-transform = Transform3D(-8.74229e-08, 0, 2, 0, 2, 0, -2, 0, -8.74229e-08, 5.08848, 0.00451851, 2.14247)
+transform = Transform3D(-8.74228e-08, 0, 2, 0, 2, 0, -2, 0, -8.74228e-08, 8.25, 3.57628e-07, 0.5)
 
 [node name="FrameWall1" type="StaticBody3D" parent="Portal2Frame"]
-transform = Transform3D(0.2, 0, 0, 0, 2.2, 0, 0, 0, 0.2, 0.5, 0, 0)
+transform = Transform3D(0.25, 0, 0, 0, 1.75, 0, 0, 0, 0.25, 0.625, 0.375, 0)
 physics_material_override = SubResource("PhysicsMaterial_esuhq")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Portal2Frame/FrameWall1"]
 shape = SubResource("BoxShape3D_7igj1")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Portal2Frame/FrameWall1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 mesh = SubResource("BoxMesh_7pe8e")
 
 [node name="FrameWall2" type="StaticBody3D" parent="Portal2Frame"]
-transform = Transform3D(0.2, 0, 0, 0, 2.2, 0, 0, 0, 0.2, -0.5, 0, 0)
+transform = Transform3D(0.25, 0, 0, 0, 1.75, 0, 0, 0, 0.25, -0.625, 0.375, 0)
 physics_material_override = SubResource("PhysicsMaterial_esuhq")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Portal2Frame/FrameWall2"]
@@ -403,7 +269,7 @@ shape = SubResource("BoxShape3D_7igj1")
 mesh = SubResource("BoxMesh_7pe8e")
 
 [node name="FrameTop" type="StaticBody3D" parent="Portal2Frame"]
-transform = Transform3D(-8.74228e-09, -1, 0, 0.2, -4.37114e-08, 0, 0, 0, 0.19, -0.001, 1, 0)
+transform = Transform3D(-1.09278e-08, -1, 0, 0.25, -4.37114e-08, 0, 0, 0, 0.25, 0, 1.125, 0)
 physics_material_override = SubResource("PhysicsMaterial_esuhq")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Portal2Frame/FrameTop"]
@@ -414,3 +280,7 @@ mesh = SubResource("BoxMesh_7pe8e")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_52ww7")
+
+[node name="DirectionalLight3d" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, 0.75, -0.433013, 0, 0, 0)
+shadow_enabled = true

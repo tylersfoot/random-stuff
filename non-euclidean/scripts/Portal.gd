@@ -98,7 +98,7 @@ func check_warp():
 	# if the player is touching the portal
 	if self in player.portals:
 		# if the player is past the portal line
-		print(self, "  ", inbound_portal_position_offset_player.z)
+		# print(self, "  ", inbound_portal_position_offset_player.z)
 		if (inbound_portal_position_offset_player.z > 0):
 			# teleport the player - offset the player's position and rotation by the portal's position and rotation offsets, with position accounting for portal rotation difference
 			player.global_transform.origin = rotate_position_around_anchor(player.global_transform.origin, global_transform.origin, portal_rotation_offset) + portal_position_offset
@@ -111,7 +111,7 @@ func on_portal_enter(body):
 	if body == player:
 		if self in player.portals:
 			print("player is touching portal... before touching it... what?")
-		print("player is touching ", self)
+		# print("player is touching ", self)
 		player.portals.append(self)
 
 
@@ -119,7 +119,7 @@ func on_portal_exit(body):
 	# if player is no longer touching portal hitbox, remove it from the list (aka right after teleport)
 	if body == player:
 		if self in player.portals:
-			print("player is no longer touching ", self)
+			# print("player is no longer touching ", self)
 			player.portals.erase(self)
 
 

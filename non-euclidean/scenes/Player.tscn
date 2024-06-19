@@ -1,15 +1,17 @@
-[gd_scene load_steps=4 format=3 uid="uid://c6ox74rcx7tcf"]
+[gd_scene load_steps=5 format=3 uid="uid://c6ox74rcx7tcf"]
 
 [ext_resource type="Script" path="res://scripts/Player.gd" id="1_7oo4u"]
+[ext_resource type="Script" path="res://scripts/FPS.gd" id="2_jgvby"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_fno86"]
 
-[sub_resource type="SphereMesh" id="SphereMesh_u86j7"]
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_wsnew"]
 
-[node name="Player" type="CharacterBody3D"]
+[node name="Player" type="CharacterBody3D" node_paths=PackedStringArray("normal_collider")]
 script = ExtResource("1_7oo4u")
+normal_collider = NodePath("PlayerCollisionShape")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="PlayerCollisionShape" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 shape = SubResource("CapsuleShape3D_fno86")
 
@@ -19,6 +21,11 @@ cull_mask = 983039
 current = true
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 layers = 65536
-mesh = SubResource("SphereMesh_u86j7")
+mesh = SubResource("CapsuleMesh_wsnew")
+
+[node name="Label" type="Label" parent="."]
+offset_right = 40.0
+offset_bottom = 23.0
+script = ExtResource("2_jgvby")

@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://0tpei1v1rapa"
+path="res://.godot/imported/discovery new item.wav-d9e089e66c9ad0f9420603615b1ea475.sample"
+
+[deps]
+
+source_file="res://assets/textures/Music/Retro Sounds/audio effects retro/statistcs (progress on your game)/discovery new item.wav"
+dest_files=["res://.godot/imported/discovery new item.wav-d9e089e66c9ad0f9420603615b1ea475.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=0

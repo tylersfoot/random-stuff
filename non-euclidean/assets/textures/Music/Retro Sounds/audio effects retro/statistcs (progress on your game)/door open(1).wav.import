@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://dgk8pqpi73f3i"
+path="res://.godot/imported/door open(1).wav-6f05c915d4ca1a31e39b8417f053ea2b.sample"
+
+[deps]
+
+source_file="res://assets/textures/Music/Retro Sounds/audio effects retro/statistcs (progress on your game)/door open(1).wav"
+dest_files=["res://.godot/imported/door open(1).wav-6f05c915d4ca1a31e39b8417f053ea2b.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=0

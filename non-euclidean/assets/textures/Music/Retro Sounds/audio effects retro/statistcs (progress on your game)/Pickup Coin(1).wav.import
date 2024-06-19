@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://b3sc22t6k3f2b"
+path="res://.godot/imported/Pickup Coin(1).wav-e5961e3e9e0df32c99a077169ce71be3.sample"
+
+[deps]
+
+source_file="res://assets/textures/Music/Retro Sounds/audio effects retro/statistcs (progress on your game)/Pickup Coin(1).wav"
+dest_files=["res://.godot/imported/Pickup Coin(1).wav-e5961e3e9e0df32c99a077169ce71be3.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=0

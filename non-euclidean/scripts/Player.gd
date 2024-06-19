@@ -1,11 +1,13 @@
 class_name Player
 extends CharacterBody3D
 
-@export var portal: Node = null # MIGHT not need this
+@export var normal_collider: CollisionShape3D = null
+@export var portal_collider: CollisionShape3D = null
 
 @onready var speed = 5
 @onready var jump_speed = 5
 @onready var mouse_sensitivity = 0.002
+@onready var portals: Array = [] # portals that the player is currently touching (should only be one, but just in case it's an array)
 
 # get the gravity from the project settings to be synced with RigidBody nodes
 @onready var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")

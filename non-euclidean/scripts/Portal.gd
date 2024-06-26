@@ -3,6 +3,8 @@ extends Node3D
 
 @export var player_node_path: NodePath  # path to the player node
 @export var outbound_portal_path: NodePath  # path to the destination portal
+@export var max_recursion: int = 3
+@export var current_recursion: int = 0
 
 @onready var mesh_instance = $MeshInstance3D
 @onready var viewport = $SubViewport
@@ -12,12 +14,14 @@ extends Node3D
 @onready var outbound_portal = get_node(outbound_portal_path) # the destination portal
 @onready var collider = $Area3D
 @onready var reverser = outbound_portal.get_node("Reverser") # object that is facing the back of the portal
+@onready var visibility_notifier = $VisibilityNotifier
 
 var inbound_portal_position_offset_camera: Vector3
 var inbound_portal_position_offset_player: Vector3
 var portal_position_offset: Vector3
 var portal_rotation_offset: Vector3
 var y_rotation_offset: Basis
+var portal_visible: bool = false
 
 
 func _ready():
@@ -25,21 +29,25 @@ func _ready():
 	portal_camera.fov = player_camera.fov
 
 	collider.monitoring = true
-	# collider.body_shape_entered.connect(Callable(self, "on_portal_enter"))
+
 	collider.body_entered.connect(Callable(self, "on_portal_enter"))
 	collider.body_exited.connect(Callable(self, "on_portal_exit"))
+
+	visibility_notifier.screen_entered.connect(Callable(self, "on_screen_enter"))
+	visibility_notifier.screen_exited.connect(Callable(self, "on_screen_exit"))
+
+	# turn off portal at start
+	portal_visible = false
+	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	mesh_instance.visible = false
 
 
 func _process(_delta):
 	# get the position and rotation offsets between the two portals
 	portal_position_offset = outbound_portal.global_transform.origin - global_transform.origin
-	# portal_rotation_offset = (global_transform.basis.inverse() * outbound_portal.global_transform.basis).inverse()
-	# portal_rotation_offset = outbound_portal.global_transform.basis.get_euler() - global_transform.basis.get_euler()
-	# Calculate the rotation offset between the portals
-	portal_rotation_offset = reverser.global_transform.basis.get_euler() - global_transform.basis.get_euler()
 
-	# set the portal viewport size to match the main viewport size
-	viewport.size = get_viewport().size
+	# calculate the rotation offset between the portals
+	portal_rotation_offset = reverser.global_transform.basis.get_euler() - global_transform.basis.get_euler()
 
 	# position offset between player camera and portal, and player and portal
 	inbound_portal_position_offset_camera = to_local(player_camera.global_transform.origin)
@@ -48,7 +56,7 @@ func _process(_delta):
 	var new_position = player_camera.global_transform.origin
 
 	# take the offset between player and inbound portal, and rotate it based around the rotation difference between the portals
-	new_position = rotate_position_around_anchor(new_position, global_transform.origin, portal_rotation_offset)
+	# new_position = rotate_position_around_anchor(new_position, global_transform.origin, portal_rotation_offset)
 
 	# offset the camera position by the portal position offset
 	new_position = new_position + portal_position_offset
@@ -56,24 +64,18 @@ func _process(_delta):
 	# rotate camera in place based on rotation difference between portals
 	var new_basis = Basis.from_euler(portal_rotation_offset) * player_camera.global_transform.basis
 
+	portal_camera.global_transform = Transform3D(new_basis, new_position)
 
-	portal_camera.global_transform.origin = new_position
-	portal_camera.global_transform.basis = new_basis
+	# if viewport.get_parent().name == "Portal1":
+		# print("rotation offset: ", portal_rotation_offset)
+		# print("new basis: ", new_basis.get_euler())
+		# print("cam position: ", portal_camera.global_transform.origin)
+		# print("cam basis: ", portal_camera.global_transform.basis)
+
+	# set the portal viewport size to match the main viewport size
+	viewport.size = get_viewport().size
 
 	check_warp()
-
-
-# func rotate_position_around_anchor(tposition: Vector3, anchor: Vector3, rotation_basis: Basis) -> Vector3:
-# 	# translate the position to the local space of the anchor
-# 	var local_position = tposition - anchor
-
-# 	# apply the rotation using the Transform
-# 	var rotated_local_position = rotation_basis * local_position
-
-# 	# translate the position back to global space
-# 	var rotated_position = rotated_local_position + anchor
-
-# 	return rotated_position
 
 func rotate_position_around_anchor(tposition: Vector3, anchor: Vector3, euler_angles: Vector3) -> Vector3:
 	# translate the position to the local space of the anchor
@@ -122,19 +124,14 @@ func on_portal_exit(body):
 			# print("player is no longer touching ", self)
 			player.portals.erase(self)
 
+func on_screen_enter():
+	portal_visible = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	mesh_instance.visible = true
 
-# func on_portal_enter(_body_id: RID, body: Node, _body_shape_index: int, area_shape_index: int):
-# 	# checks if player's portal collider entered portal
-# 	print("body: ", body)
-# 	if body == player:
-# 		# check if the specific shape is the portal detection shape
-# 		var shape_owner_id = body.shape_find_owner(_body_shape_index)
-# 		var shape_owner = body.shape_owner_get_owner(shape_owner_id)
-# 		# var shape_owner = collider.shape_owner_get_owner(area_shape_index)
-# 		# print("shape_owner_id: ", shape_owner_id)
-# 		# print("shape_owner: ", shape_owner)
-# 		# print("shape_owner.name: ", shape_owner.name)
-# 		if shape_owner.name == "PortalCollisionShape":
-# 			print("player entered portal")
-# 			player.portal = self
-# 			check_warp()
+
+func on_screen_exit():
+	portal_visible = false
+	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	mesh_instance.visible = false
+

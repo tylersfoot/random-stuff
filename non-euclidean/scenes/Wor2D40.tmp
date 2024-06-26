@@ -273,12 +273,12 @@ distance_fade_begin = 0.0
 omni_range = 26.582
 
 [node name="Portal1" parent="." instance=ExtResource("7_2518q")]
-transform = Transform3D(-2, 0, -8.74228e-08, 0, 3, 0, 1.74846e-07, 0, -1, 0, 0.5, 9.75)
+transform = Transform3D(2, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0.5, 9.75)
 player_node_path = NodePath("../Player")
 outbound_portal_path = NodePath("../Portal2")
 
 [node name="PortalFrame1" type="Node3D" parent="."]
-transform = Transform3D(-2, 0, -1.74846e-07, 0, 2, 0, 1.74846e-07, 0, -2, 0, 0, 9.75)
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 9.75)
 
 [node name="FrameWall1" type="StaticBody3D" parent="PortalFrame1"]
 transform = Transform3D(0.25, 0, 0, 0, 1.75, 0, 0, 0, 0.25, 0.625, 0.375, 0)
@@ -311,12 +311,12 @@ shape = SubResource("BoxShape3D_7igj1")
 mesh = SubResource("BoxMesh_uxbej")
 
 [node name="Portal2" parent="." instance=ExtResource("7_2518q")]
-transform = Transform3D(2, 0, 0, 0, 3, 0, 0, 0, 1, 5, 0.499963, 9.75)
+transform = Transform3D(-8.74228e-08, 0, 1, 0, 3, 0, -2, 0, -4.37114e-08, 10.25, 0.499963, 1.5)
 player_node_path = NodePath("../Player")
 outbound_portal_path = NodePath("../Portal1")
 
 [node name="PortalFrame2" type="Node3D" parent="."]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 5, 3.7387e-05, 9.75)
+transform = Transform3D(-8.74228e-08, 0, 2, 0, 2, 0, -2, 0, -8.74228e-08, 10.25, 3.7387e-05, 1.5)
 
 [node name="FrameWall1" type="StaticBody3D" parent="PortalFrame2"]
 transform = Transform3D(0.25, 0, 0, 0, 1.75, 0, 0, 0, 0.25, 0.625, 0.375, 0)

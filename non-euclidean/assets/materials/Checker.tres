@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://cg0u0b2hvwcq7"]
+
+[ext_resource type="Texture2D" uid="uid://b38w0hbs0s4qu" path="res://assets/images/checkers_white.png" id="1_8lpss"]
+
+[resource]
+albedo_texture = ExtResource("1_8lpss")
+metallic_specular = 0.0
+uv1_triplanar = true
+uv1_world_triplanar = true

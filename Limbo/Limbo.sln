@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34511.84
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Limbo", "Limbo.csproj", "{D9599748-7F33-4BCF-82D7-22CBD877E5D2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D9599748-7F33-4BCF-82D7-22CBD877E5D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9599748-7F33-4BCF-82D7-22CBD877E5D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9599748-7F33-4BCF-82D7-22CBD877E5D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9599748-7F33-4BCF-82D7-22CBD877E5D2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {41E90F13-73D7-4AB4-8919-2ACE53AD8088}
+	EndGlobalSection
+EndGlobal

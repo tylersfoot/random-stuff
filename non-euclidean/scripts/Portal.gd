@@ -134,4 +134,3 @@ func on_screen_exit():
 	portal_visible = false
 	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	mesh_instance.visible = false
-

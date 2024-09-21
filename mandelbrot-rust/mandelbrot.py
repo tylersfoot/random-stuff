@@ -87,13 +87,6 @@ def mirror_image(image: Image) -> Image:
     
     return mirrored_image
 
-def split_image(image, num_sections):
-    # split the image into num_sections along the height dimension
-    w, h = image.shape[:2]
-    section_height = h // num_sections
-    sections = [image[:, i * section_height:(i + 1) * section_height] for i in range(num_sections)]
-    return sections
-
 def main():
     
     p = {

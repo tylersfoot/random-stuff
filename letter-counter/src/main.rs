@@ -1,7 +1,7 @@
 use std::time::Instant;
 use std::fs::File;
-// use std::io::Read;
-// use std::collections::HashMap;
+use std::io::Read;
+use std::collections::HashMap;
 use rayon::prelude::*;
 use memmap2::Mmap;
 use std::fmt::Write;
@@ -9,15 +9,12 @@ use std::fmt::Write;
 fn main() {
     let now = Instant::now(); // for benchmarking time
 
-    // let mut file = File::open("input.txt").unwrap();
-    let file = File::open("input.txt").unwrap();
-
-
-    // let mut text = String::new();
-    // file.read_to_string(&mut text).unwrap();
+    let mut file = File::open("input.txt").unwrap();
 
 
     // ~233000 ms
+    // let mut text = String::new();
+    // file.read_to_string(&mut text).unwrap();
     // text = text.to_lowercase();
     // let letters: [&str; 26] = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"];
     // let mut letter_counts: [i32; 26] = [0; 26];
@@ -35,6 +32,8 @@ fn main() {
 
 
     // ~21400ms
+    // let mut text = String::new();
+    // file.read_to_string(&mut text).unwrap();
     // text = text.to_lowercase();
     // let letters = "abcdefghijklmnopqrstuvwxyz";
     // let mut letter_counts = HashMap::new();
@@ -58,6 +57,8 @@ fn main() {
 
 
     // ~15500ms
+    // let mut text = String::new();
+    // file.read_to_string(&mut text).unwrap();
     // text = text.to_lowercase();
     // let mut letter_counts = HashMap::from([
     //     ('a', 0), ('b', 0), ('c', 0), ('d', 0), ('e', 0), ('f', 0), 
@@ -87,6 +88,8 @@ fn main() {
 
 
     // ~11700ms
+    // let mut text = String::new();
+    // file.read_to_string(&mut text).unwrap();
     // let mut letter_counts: HashMap<char, usize> = HashMap::with_capacity(26);
     // for byte in text.bytes() {
     //     if byte.is_ascii_alphabetic() {
@@ -106,6 +109,8 @@ fn main() {
 
 
     // ~1520ms
+    // let mut text = String::new();
+    // file.read_to_string(&mut text).unwrap();
     // let mut letter_counts = [0usize; 26];
     // for byte in text.bytes() {
     //     if byte.is_ascii_alphabetic() {
@@ -123,21 +128,23 @@ fn main() {
     // print!("{}", result);
 
     // ~750ms
+    // let mut text = String::new();
+    // file.read_to_string(&mut text).unwrap();
     // let letter_counts = text
-    //     .par_bytes() // Process bytes in parallel
-    //     .filter(|&byte| byte.is_ascii_alphabetic()) // Filter only alphabetic characters
-    //     .map(|byte| (byte.to_ascii_lowercase() - b'a') as usize) // Map to index
+    //     .par_bytes()
+    //     .filter(|&byte| byte.is_ascii_alphabetic())
+    //     .map(|byte| (byte.to_ascii_lowercase() - b'a') as usize)
     //     .fold(|| [0usize; 26], |mut acc, idx| {
     //         acc[idx] += 1;
     //         acc
-    //     }) // Create a local array for each thread
+    //     })
     //     .reduce(|| [0usize; 26], |mut acc1, acc2| {
     //         for i in 0..26 {
-    //             acc1[i] += acc2[i]; // Merge thread-local arrays into the final result
+    //             acc1[i] += acc2[i];
     //         }
     //         acc1
     //     }); // Reduce and combine all the results
-    // let mut result = String::with_capacity(52); // Pre-allocate space for efficiency
+    // let mut result = String::with_capacity(52);
     // for (i, &count) in letter_counts.iter().enumerate() {
     //     if count > 0 {
     //         let letter = (b'a' + i as u8) as char;
@@ -148,7 +155,7 @@ fn main() {
 
     // 105ms
     // let mmap = unsafe { Mmap::map(&file).unwrap() };
-    // let chunk_size = 65536; // Process in batches of 1024 bytes
+    // let chunk_size = 65536;
     // let letter_counts = mmap
     //     .par_chunks(chunk_size)
     //     .map(|chunk| {
@@ -167,7 +174,7 @@ fn main() {
     //         }
     //         acc1
     //     });
-    // let mut result = String::with_capacity(52); // Pre-allocate space for efficiency
+    // let mut result = String::with_capacity(52);
     // for (i, &count) in letter_counts.iter().enumerate() {
     //     if count > 0 {
     //         let letter = (b'a' + i as u8) as char;
@@ -178,7 +185,7 @@ fn main() {
 
     
     let mmap = unsafe { Mmap::map(&file).unwrap() };
-    let chunk_size = 128 * 1024;
+    let chunk_size = 16 * 1024;
     let letter_counts = mmap
         .par_chunks(chunk_size)
         .fold(|| [0usize; 26], #[inline(always)] |mut local_counts, chunk| {

@@ -29,7 +29,7 @@ fn calculate_notes_sv(frames: Vec<Vec<Vec<u8>>>, width: u32, height: u32, fps: u
     let mut notes = Vec::new(); // array of strings in the exact format: {"time":180.0,"lane":1,"holdtime":0.0,"hitsound":":normal","type":0},
     let mut svs = Vec::new(); // array of strings in the exact format: {"time":0,"multiplier":0},
     let offset_ms = 180.0; // offset for song
-    let frame_diff_ms = 1000.0 / fps as f64 * 5.0; // ms between each frame
+    let frame_diff_ms = 1000.0 / fps as f64; // ms between each frame
     let row_diff_ms = 0.001; // ms between each row of notes // 0.01 -> 4000x sv (when sv_diff_ms = 1)
     let sv_diff_ms = 0.1; // ms between each sv change (between the fast and the 0)
     let sv_multiplier = row_diff_ms * 50000000.0; // the fast sv

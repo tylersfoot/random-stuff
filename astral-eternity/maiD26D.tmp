@@ -1,0 +1,65 @@
+[gd_scene load_steps=10 format=3 uid="uid://dpwpnpkqjvmse"]
+
+[ext_resource type="Script" path="res://player.gd" id="1_grkg6"]
+[ext_resource type="Texture2D" uid="uid://bdf4ddqdnmlhd" path="res://assets/Free-Sky-with-Clouds-Background-Pixel-Art8.jpg" id="2_nd155"]
+[ext_resource type="Shader" path="res://density.gdshader" id="3_oxb8b"]
+[ext_resource type="Script" path="res://density_map_canvas.gd" id="4_052dx"]
+[ext_resource type="Texture2D" uid="uid://c4r2csjh3hrvw" path="res://assets/arrow.png" id="5_20r2d"]
+[ext_resource type="PackedScene" uid="uid://bgwxh8ugi1kgi" path="res://alternateuniverse.tscn" id="5_xtsx3"]
+[ext_resource type="PackedScene" uid="uid://bvf5tupcqyrc0" path="res://Metaball.tscn" id="6_qbcpy"]
+[ext_resource type="Script" path="res://metaball_manager.gd" id="7_c3ouw"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_4bxhn"]
+shader = ExtResource("3_oxb8b")
+
+[node name="Node2D" type="Node2D"]
+
+[node name="AlternateUniverseViewportContainer" type="SubViewportContainer" parent="."]
+visible = false
+offset_right = 2000.0
+offset_bottom = 1000.0
+
+[node name="AlternateUniverseViewport" type="SubViewport" parent="AlternateUniverseViewportContainer"]
+handle_input_locally = false
+size = Vector2i(2000, 1000)
+render_target_update_mode = 0
+
+[node name="AlternateUniverseContent" parent="AlternateUniverseViewportContainer/AlternateUniverseViewport" instance=ExtResource("5_xtsx3")]
+
+[node name="Background" type="TextureRect" parent="."]
+visible = false
+offset_left = -51.0
+offset_top = -129.0
+offset_right = 2055.0
+offset_bottom = 1133.0
+size_flags_horizontal = 3
+size_flags_vertical = 3
+texture = ExtResource("2_nd155")
+
+[node name="DensityMapViewportContainer" type="SubViewportContainer" parent="."]
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="DensityMapViewport" type="SubViewport" parent="DensityMapViewportContainer"]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(2000, 1000)
+render_target_update_mode = 4
+
+[node name="DensityMapCanvas" type="Node2D" parent="DensityMapViewportContainer/DensityMapViewport" node_paths=PackedStringArray("metaball_manager")]
+material = SubResource("ShaderMaterial_4bxhn")
+script = ExtResource("4_052dx")
+metaball_manager = NodePath("../../../MetaballManager")
+
+[node name="MetaballManager" type="Node2D" parent="."]
+script = ExtResource("7_c3ouw")
+metaball_scene = ExtResource("6_qbcpy")
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="."]
+z_index = 2
+script = ExtResource("1_grkg6")
+
+[node name="Sprite2D" type="Sprite2D" parent="CharacterBody2D"]
+rotation = 1.5708
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("5_20r2d")

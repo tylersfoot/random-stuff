@@ -1,0 +1,272 @@
+[gd_scene load_steps=20 format=3 uid="uid://cys12thfntdpv"]
+
+[ext_resource type="PackedScene" uid="uid://c6ox74rcx7tcf" path="res://scenes/Player.tscn" id="1_bqdxf"]
+[ext_resource type="Script" uid="uid://cxs7l7gmsb0wf" path="res://scripts/World.gd" id="1_yjypi"]
+[ext_resource type="Texture2D" uid="uid://b38w0hbs0s4qu" path="res://assets/images/checkers_white.png" id="3_3urc1"]
+[ext_resource type="Texture2D" uid="uid://c54d2ilo05n1u" path="res://assets/images/AllSkyFree_Sky_ClearBlueSky_Equirect.png" id="3_jem7w"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_d1c63"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_oby5j"]
+panorama = ExtResource("3_jem7w")
+
+[sub_resource type="Sky" id="Sky_nr8k0"]
+sky_material = SubResource("PanoramaSkyMaterial_oby5j")
+
+[sub_resource type="Environment" id="Environment_52ww7"]
+background_mode = 2
+sky = SubResource("Sky_nr8k0")
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_sky_contribution = 0.0
+tonemap_white = 1.2
+volumetric_fog_enabled = true
+volumetric_fog_density = 0.005
+volumetric_fog_emission = Color(0.607843, 0.870588, 0.992157, 1)
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_esuhq"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ttr8s"]
+size = Vector3(10, 2, 10)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4j2vl"]
+albedo_color = Color(0.478431, 1, 0.372549, 1)
+albedo_texture = ExtResource("3_3urc1")
+metallic_specular = 0.0
+uv1_triplanar = true
+uv1_world_triplanar = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_2cti4"]
+material = SubResource("StandardMaterial3D_4j2vl")
+size = Vector3(10, 2, 10)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_7igj1"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_d3xvy"]
+albedo_color = Color(0.456574, 0.308652, 0.229154, 1)
+albedo_texture = ExtResource("3_3urc1")
+metallic_specular = 0.0
+uv1_triplanar = true
+uv1_world_triplanar = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_7pe8e"]
+material = SubResource("StandardMaterial3D_d3xvy")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_lc6ua"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_pqmyn"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1d5p7"]
+next_pass = SubResource("ShaderMaterial_pqmyn")
+transparency = 1
+depth_draw_mode = 1
+albedo_color = Color(1, 1, 1, 0.356863)
+metallic = 1.0
+metallic_specular = 1.0
+ao_enabled = true
+ao_light_affect = 1.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_4dk32"]
+material = SubResource("StandardMaterial3D_1d5p7")
+
+[node name="World" type="Node3D"]
+script = ExtResource("1_yjypi")
+
+[node name="TextureRect" type="TextureRect" parent="."]
+texture_filter = 1
+offset_right = 1920.0
+offset_bottom = 1080.0
+texture = SubResource("ViewportTexture_d1c63")
+stretch_mode = 4
+
+[node name="SubViewport" type="SubViewport" parent="."]
+transparent_bg = true
+size = Vector2i(384, 216)
+
+[node name="Player" parent="SubViewport" instance=ExtResource("1_bqdxf")]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="SubViewport"]
+environment = SubResource("Environment_52ww7")
+
+[node name="DirectionalLight3d" type="DirectionalLight3D" parent="SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1.19249e-08, 1, 0, -1, 1.19249e-08, 0, 0, 0)
+
+[node name="Ground" type="StaticBody3D" parent="SubViewport"]
+transform = Transform3D(3, 0, 0, 0, 1, 0, 0, 0, 3, 0, -2, 0)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Ground"]
+shape = SubResource("BoxShape3D_ttr8s")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Ground"]
+mesh = SubResource("BoxMesh_2cti4")
+
+[node name="Things" type="Node3D" parent="SubViewport"]
+
+[node name="Thing" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -3.69104, -0.956374, 2.89906)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing2" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -3.91243, -0.299317, 1.43962)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing2"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing2"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing3" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -3.10021, 0.298708, 0.497405)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing3"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing3"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing4" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -3.87335, 0.862902, -0.955132)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing4"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing4"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing5" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -4.04496, 1.48266, -2.22748)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing5"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing5"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing6" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, -2.84101, 1.05733, -4.35444)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing6"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing6"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing7" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, -0.60802, 1.21174, -4.54177)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing7"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing7"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing8" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 0.538234, 0.72316, -4.86251)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing8"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing8"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing9" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 1.66732, 1.58601, -5.5172)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing9"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing9"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing10" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(4, 0, 0, 0, 4, 0, 0, 0, 4, 2.83176, 0.902449, -4.351)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing10"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing10"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Window" type="StaticBody3D" parent="SubViewport/Things"]
+process_mode = 4
+transform = Transform3D(3, 0, 0, 0, 5, 0, 0, 0, 0.5, 3.57331, 4.98599, -5.13833)
+visible = false
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Window"]
+shape = SubResource("BoxShape3D_lc6ua")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Window"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0013392, 0, 0)
+mesh = SubResource("BoxMesh_4dk32")
+
+[node name="Thing11" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(2.04661, 0, 0, 0, 10.7846, 0, 0, 0, 1.92773, 11.1172, 1.85549, 11.5532)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing11"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing11"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing12" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(1.30462, 0, 0, 0, 10.7846, 0, 0, 0, 1.92773, 3.29001, 3.04576, 11.5532)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing12"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing12"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing13" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(0.170922, -10.0576, 0, 0.836819, 2.0543, 0, 0, 0, 2.41624, 7.38284, 7.90751, 11.5532)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing13"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing13"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="Thing14" type="StaticBody3D" parent="SubViewport/Things"]
+transform = Transform3D(12243.3, 0, 0, 0, 1.07138, 0, 0, 0, 5.35005, -15.5299, -2.47266, 11.2886)
+physics_material_override = SubResource("PhysicsMaterial_esuhq")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SubViewport/Things/Thing14"]
+shape = SubResource("BoxShape3D_7igj1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewport/Things/Thing14"]
+mesh = SubResource("BoxMesh_7pe8e")
+
+[node name="OmniLight3D" type="OmniLight3D" parent="SubViewport"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6.86173, 0.192167)
+visible = false
+light_color = Color(1, 0.729412, 0.396078, 1)
+light_energy = 14.152
+light_indirect_energy = 16.0
+light_volumetric_fog_energy = 16.0
+light_size = 1.0
+shadow_enabled = true
+shadow_opacity = 0.91
+shadow_blur = 10.0
+distance_fade_begin = 0.0
+omni_range = 26.582

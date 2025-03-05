@@ -1,0 +1,51 @@
+[gd_scene load_steps=9 format=3 uid="uid://c6ox74rcx7tcf"]
+
+[ext_resource type="Script" uid="uid://co515o0vuga0w" path="res://scripts/Player.gd" id="1_7oo4u"]
+[ext_resource type="Script" uid="uid://yil5dw63lrqt" path="res://scripts/FPS.gd" id="2_jgvby"]
+[ext_resource type="Script" uid="uid://b3rn5ulikf5eo" path="res://scripts/Camera.gd" id="2_sih2d"]
+[ext_resource type="Shader" uid="uid://dgfrtvf64jf8p" path="res://assets/shaders/Pixel.gdshader" id="3_wpved"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_fno86"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_due1i"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gfobd"]
+render_priority = 0
+shader = ExtResource("3_wpved")
+shader_parameter/pixel_size = 4
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_wsnew"]
+
+[node name="Player" type="CharacterBody3D"]
+script = ExtResource("1_7oo4u")
+
+[node name="PlayerCollisionShape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_fno86")
+
+[node name="CameraTarget" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+cull_mask = 983039
+current = true
+fov = 100.0
+near = 0.001
+script = ExtResource("2_sih2d")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Camera3D"]
+transform = Transform3D(3, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, -0.873)
+visible = false
+mesh = SubResource("QuadMesh_due1i")
+surface_material_override/0 = SubResource("ShaderMaterial_gfobd")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+layers = 65536
+mesh = SubResource("CapsuleMesh_wsnew")
+
+[node name="Label" type="Label" parent="."]
+offset_right = 40.0
+offset_bottom = 23.0
+script = ExtResource("2_jgvby")

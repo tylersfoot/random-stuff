@@ -1,33 +1,4 @@
-//! # [Ratatui] User Input example
-//!
-//! The latest version of this example is available in the [examples] folder in the repository.
-//!
-//! Please note that the examples are designed to be run against the `main` branch of the Github
-//! repository. This means that you may not be able to compile with the latest release version on
-//! crates.io, or the one that you have installed locally.
-//!
-//! See the [examples readme] for more information on finding examples that match the version of the
-//! library you are using.
-//!
-//! [Ratatui]: https://github.com/ratatui/ratatui
-//! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
-//! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
-
-// A simple example demonstrating how to handle user input. This is a bit out of the scope of
-// the library as it does not provide any input handling out of the box. However, it may helps
-// some to get started.
-//
-// This is a very simple example:
-//   * An input box always focused. Every character you type is registered here.
-//   * An entered character is inserted at the cursor position.
-//   * Pressing Backspace erases the left character before the cursor position
-//   * Pressing Enter pushes the current input in the history of previous messages. **Note: ** as
-//   this is a relatively simple example unicode characters are unsupported and their use will
-// result in undefined behaviour.
-//
-// See also https://github.com/rhysd/tui-textarea and https://github.com/sayanarijit/tui-input/
-
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use color_eyre::Result;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
@@ -38,27 +9,51 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 use std::fs::File;
+use std::io;
 use std::io::BufReader;
-use std::time::Duration;
-use ratatui::layout::{Alignment, Direction};
+use std::time::{Duration, Instant};
+use crossterm::event::KeyEvent;
+use ratatui::layout::{Alignment, Direction, Rect};
 use ratatui::symbols::border;
 use rodio::{Decoder, OutputStream, Sink};
-use rodio::source::{SineWave, Source};
+use rodio::source::{ChannelVolume, SineWave, Source};
 
 fn main() -> Result<()> {
     color_eyre::install()?;
     let terminal = ratatui::init();
-    let app_result = App::new().run(terminal);
+    let result = App::new().run(terminal);
     ratatui::restore();
-    app_result
+    Ok(result?)
+}
+
+/// struct to hold information for a song/audio
+struct Song {
+    source: Box<dyn Source<Item = f32> + Send>,
+    sample_rate: u32,
+    channels: u16,
+    duration: f64,
+}
+
+impl Song {
+    fn new(source: impl Source<Item = f32> + Send + 'static) -> Self {
+        let sample_rate = source.sample_rate();
+        let channels = source.channels();
+        let duration = source.duration().unwrap_or(0.0);
+        Self {
+            source: Box::new(source),
+            sample_rate,
+            channels,
+            duration,
+        }
+    }
 }
 
 struct Player {
     /// Sink for the audio
     sink: Sink,
-    /// Playback speed, in percent (25-400)
+    /// Playback speed, 1.0 is normal speed
     playback_speed: f32,
-    /// Current volume, in percent (0-100)
+    /// Current volume (0-1)
     volume: f32,
     /// Current position in the song, in ms
     position: f64,
@@ -76,13 +71,17 @@ struct Player {
 
 impl Player {
     fn set_playback_speed(&mut self, speed: f32) {
+        let speed = speed.max(0.5).min(2.0);
         self.playback_speed = speed;
+        self.sink.set_speed(speed);
     }
     fn get_playback_speed(&self) -> f32 {
         self.playback_speed
     }
     fn set_volume(&mut self, volume: f32) {
+        let volume = volume.max(0.0).min(1.0);
         self.volume = volume;
+        self.sink.set_volume(volume);
     }
     fn get_volume(&self) -> f32 {
         self.volume
@@ -131,11 +130,14 @@ enum LoopType {
     LoopOne // Loop the current song
 }
 
-
-
 struct App {
     _stream: OutputStream,
     player: Player,
+    start_time: Instant,
+    last_frame_time: Instant,
+    fps: f64,
+    frame_times: VecDeque<f64>,
+    exit: bool, // quit when true
 }
 
 impl App {
@@ -149,67 +151,291 @@ impl App {
         let source = Decoder::new(file).unwrap();
         sink.append(source);
 
+        sink.set_speed(1.0);
+        sink.set_volume(0.2);
+        sink.play();
+
         Self {
             _stream,
             // init player with default settings
             player: Player {
                 sink,
                 playback_speed: 1.0,
-                volume: 100.0,
+                volume: 0.2,
                 position: 0.0,
                 duration: 0.0,
-                playing: false,
+                playing: true,
                 audio_metadata: HashMap::new(),
                 loop_type: LoopType::None,
                 shuffle: false,
             },
+            start_time: Instant::now(),
+            last_frame_time: Instant::now(),
+            fps: 0.0,
+            frame_times: VecDeque::new(),
+            exit: false,
         }
     }
 
-    fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
-        loop {
-            terminal.draw(|frame| self.draw(frame))?;
-
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Backspace | KeyCode::Esc => {
-                            return Ok(());
-                        }
-                        KeyCode::Char(' ') => {
-                            self.player.toggle_playing();
-                        }
-                        // KeyCode::Enter => self.submit_message(),
-                        // KeyCode::Char(to_insert) => self.enter_char(to_insert),
-                        // KeyCode::Left => self.move_cursor_left(),
-                        // KeyCode::Right => self.move_cursor_right(),
-                        _ => {}
-                    }
-                }
+    pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<()> {
+        self.last_frame_time = Instant::now();
+        self.frame_times = VecDeque::new();
+        while !self.exit {
+            let elapsed: f64 = self.start_time.elapsed().as_secs_f64();
+            let now = Instant::now();
+            let frame_duration = now.duration_since(self.last_frame_time).as_secs_f64();
+            self.last_frame_time = now;
+            // store the frame time
+            self.frame_times.push_back(frame_duration);
+            // remove old frame times
+            while self.frame_times.len() > 1 && self.frame_times.iter().sum::<f64>() > 3.0 {
+                self.frame_times.pop_front();
             }
+
+            // calculate the average FPS
+            let total_time: f64 = self.frame_times.iter().sum();
+            self.fps = self.frame_times.len() as f64 / total_time;
+
+            terminal.draw(|frame| self.draw(frame))?;
+            self.handle_events()?;
         }
+        Ok(())
+    }
+
+
+    /// updates the application's state based on user input
+    fn handle_events(&mut self) -> io::Result<()> {
+        if event::poll(Duration::from_millis(0))? {
+            match event::read()? {
+                // it's important to check that the event is a key press event as
+                // crossterm also emits key release and repeat events on Windows.
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                    self.handle_key_event(key_event)
+                }
+                _ => {}
+            };
+        }
+        Ok(())
+    }
+
+    fn handle_key_event(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('q') | KeyCode::Backspace | KeyCode::Esc => {
+                self.exit();
+            }
+            KeyCode::Char(' ') => {
+                self.player.toggle_playing();
+            }
+            KeyCode::Up => {
+                let volume = self.player.get_volume() + 0.1;
+                self.player.set_volume(volume);
+            }
+            KeyCode::Down => {
+                let volume = self.player.get_volume() - 0.1;
+                self.player.set_volume(volume);
+            }
+            KeyCode::Char('o') => {
+                let speed = self.player.get_playback_speed() - 0.1;
+                self.player.set_playback_speed(speed);
+            }
+            KeyCode::Char('p') => {
+                let speed = self.player.get_playback_speed() + 0.1;
+                self.player.set_playback_speed(speed);
+            }
+            _ => {}
+        }
+    }
+
+    fn exit(&mut self) {
+        self.exit = true;
     }
 
     fn draw(&self, frame: &mut Frame) {
-        let size = frame.area();
+        if (frame.area().width < 130) || (frame.area().height < 40) {
+            let area = frame.area();
+            let text = "Please expand your terminal or zoom out!";
+            let text_height = 1;
+            let text_width = text.len() as u16;
 
-        // Create the main block that takes the entire terminal size
-        let main_block = Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::White));
-        frame.render_widget(main_block, size);
+            // calculate the centered position for the box
+            let box_width = text_width + 4;
+            let box_height = text_height + 2;
+            let x = (area.width.saturating_sub(box_width)) / 2;
+            let y = (area.height.saturating_sub(box_height)) / 2;
 
-        // Calculate the centered position for the player block
-        let player_width = 40;
-        let player_height = 35;
-        let x = (size.width.saturating_sub(player_width)) / 2;
-        let y = (size.height.saturating_sub(player_height)) / 2;
+            // create the centered box
+            let box_area = Rect::new(x, y, box_width, box_height);
+            frame.render_widget(Block::bordered(), box_area);
 
-        // Create the player block with a fixed size of 100x50
-        let player_block = Block::bordered()
-            .title(Line::from(" Player ".bold()).centered())
-            .border_set(border::THICK);
-        let player_area = ratatui::layout::Rect::new(x, y, player_width, player_height);
-        frame.render_widget(player_block, player_area);
+            // render the centered text inside the box
+            frame.render_widget(
+                Paragraph::new(text)
+                    .alignment(Alignment::Center)
+                    .style(Style::default().fg(Color::White)),
+                Rect::new(x + 1, y + 1, text_width + 2, text_height),
+            );
+            return;
+        }
+
+        // create the main block that takes the entire terminal size
+        let main = Rect::new(
+            0,
+            0,
+            frame.area().width,
+            frame.area().height,
+        );
+
+
+        let main_title = Line::from(vec![
+            Span::raw(" tylersfoot's audio player | "),
+            Span::raw("HxW: "),
+            Span::styled(format!("{}x{}", main.width, main.height), Style::default().fg(Color::Yellow)),
+            Span::raw(" | FPS: "),
+            Span::styled(format!("{:.0} ", self.fps), Style::default().fg(Color::Yellow)),
+        ]);
+
+        frame.render_widget(
+            Block::default()
+                .title(main_title)
+                .title_alignment(Alignment::Center)
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White)),
+            main,
+        );
+
+        let main_pad = Rect::new(
+            main.x + 2,
+            main.y + 1,
+            main.width.saturating_sub(4),
+            main.height.saturating_sub(2),
+        );
+
+
+        let [block_top, block_visualizer] = Layout::vertical([
+            Constraint::Length(35),
+            Constraint::Min(1),
+        ]).areas(main_pad);
+
+        frame.render_widget(Block::bordered()
+                                .title(" Visualizer ")
+                                .title_alignment(Alignment::Center), block_visualizer);
+
+        let [block_left, block_player, block_right] = Layout::horizontal([
+            Constraint::Min(1),
+            Constraint::Length(50),
+            Constraint::Min(1),
+        ]).areas(block_top);
+
+        frame.render_widget(
+            // multiline text
+            self.player_content(block_player.width as usize, block_player.height as usize)
+                .block(default_block(" Player ")),
+            block_player,
+        );
+
+        let [block_file_picker, block_queue] = Layout::vertical([
+            Constraint::Percentage(20),
+            Constraint::Percentage(80),
+        ]).areas(block_left);
+        frame.render_widget(Block::bordered()
+                                .title(" File Picker ")
+                                .title_alignment(Alignment::Center), block_file_picker);
+        frame.render_widget(Block::bordered()
+                                .title(" Queue ")
+                                .title_alignment(Alignment::Center), block_queue);
+
+        let [block_telly, block_osc] = Layout::vertical([
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
+        ]).areas(block_right);
+
+        frame.render_widget(Block::bordered()
+                                .title(" Oscilloscope ")
+                                .title_alignment(Alignment::Center), block_osc);
+
+        let sine_wave = self.generate_sine_wave(
+            block_telly.width as usize - 2,
+            block_telly.height as usize - 2
+        );
+
+        frame.render_widget(
+            Paragraph::new(sine_wave)
+                .alignment(Alignment::Left)
+                .style(Style::default().fg(Color::White))
+                .block(default_block(" Meow ")),
+            block_telly,
+        );
+
     }
+
+    fn player_content(&self, width: usize, height: usize) -> Paragraph {
+
+        let volume = format!("{:.2} ", self.player.get_volume());
+        let playing = self.player.is_playing().to_string();
+        let speed = format!("{:.2} ", self.player.get_playback_speed());
+
+        let content_lines: Vec<Line> = vec![
+            // Line::from(Span::raw("test")),
+            Line::from(Span::styled("meow hi umm meow", Style::default().fg(Color::White))),
+            Line::from(Span::styled("d-_-b", Style::default().fg(Color::LightMagenta))),
+            Line::from(Span::raw(" ")),
+            // Line::from(Span::raw(self.player.sink.source().sample_rate().to_string())),
+            Line::from(Span::raw(" ")),
+            Line::from(vec![
+                Span::styled("playing: ", Style::default().fg(Color::White)),
+                Span::styled(playing, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("volume: ", Style::default().fg(Color::White)),
+                Span::styled(volume, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("speed: ", Style::default().fg(Color::White)),
+                Span::styled(speed, Style::default().fg(Color::Yellow)),
+            ]),
+        ];
+
+        let content_height = content_lines.len();
+        let padding_top = if height > content_height {
+            (height - content_height) / 2
+        } else {0};
+
+        let mut lines = Vec::new();
+        for _ in 0..padding_top {
+            lines.push(Line::from(""));
+        }
+        lines.extend(content_lines);
+
+        Paragraph::new(Text { lines, ..Default::default() })
+            .alignment(Alignment::Center)
+    }
+
+    fn generate_sine_wave(&self, width: usize, height: usize) -> String {
+        let time = self.start_time.elapsed().as_secs_f64() * 1.5;
+        let mut wave = String::new();
+        let frequency = 1.0 * std::f64::consts::PI / width as f64;
+
+        for y in 0..height {
+            for x in 0..width {
+                // let taper_factor = 1.0 - (x as f64 / width as f64 * 2.0 - 1.0).abs();
+                // let value = (x as f64 * frequency + time).sin() * taper_factor;
+                let value = (x as f64 * frequency + time).sin();
+                let scaled_value = ((value + 1.0) * (height as f64 / 2.3)).round() as usize;
+                if scaled_value == y {
+                    wave.push('#');
+                } else {
+                    wave.push(' ');
+                }
+            }
+            wave.push('\n');
+        }
+        wave
+    }
+}
+
+fn default_block(title: &str) -> Block {
+    Block::default()
+        .borders(Borders::ALL)
+        .title(title)
+        .title_alignment(Alignment::Center)
 }

@@ -6,6 +6,9 @@ edition = "2021"
 [dependencies]
 color-eyre = "0.6.3"
 crossterm = "0.28.1"
+id3 = "1.16.2"
+image = "0.25.5"
+lofty = "0.22.2"
 rand = "0.9.0"
 ratatui = { version = "0.29.0", features = ["all-widgets"] }
 rodio = "0.20.1"

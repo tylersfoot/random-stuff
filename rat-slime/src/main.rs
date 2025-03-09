@@ -9,14 +9,20 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 use std::fs::File;
-use std::io;
+use std::{fs, io};
+use std::error::Error;
 use std::io::BufReader;
+use std::path::Path;
 use std::time::{Duration, Instant};
 use crossterm::event::KeyEvent;
 use ratatui::layout::{Alignment, Direction, Rect};
-use ratatui::symbols::border;
 use rodio::{Decoder, OutputStream, Sink};
 use rodio::source::{ChannelVolume, SineWave, Source};
+use id3::{Tag, TagLike};
+use image::io::Reader as ImageReader;
+use lofty::file::{AudioFile, TaggedFileExt};
+use lofty::prelude::Accessor;
+use lofty::read_from_path;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -27,25 +33,106 @@ fn main() -> Result<()> {
 }
 
 /// struct to hold information for a song/audio
+#[derive(Clone)]
 struct Song {
-    source: Box<dyn Source<Item = f32> + Send>,
+    /// Path to the audio file
+    path: std::path::PathBuf,
+    /// Sample rate of the audio
     sample_rate: u32,
+    /// Number of channels in the audio (1 for mono, 2 for stereo)
     channels: u16,
-    duration: f64,
+    /// Duration of the audio
+    duration: Duration,
+    /// Title/name of the song
+    title: Option<String>,
+    /// Artist of the song
+    artist: Option<String>,
+    /// Album of the song
+    album: Option<String>,
+    /// Year the song was released
+    year: Option<String>,
+    // /// Album cover of the song
+    // cover: Option<Vec<u8>>,
 }
 
 impl Song {
-    fn new(source: impl Source<Item = f32> + Send + 'static) -> Self {
+    fn new(path: std::path::PathBuf) -> Self {
+        let file = File::open(&path).unwrap();
+        let buf_reader = BufReader::new(file);
+        let source = Decoder::new(buf_reader).unwrap();
         let sample_rate = source.sample_rate();
         let channels = source.channels();
-        let duration = source.duration().unwrap_or(0.0);
-        Self {
-            source: Box::new(source),
+        let mut song = Self {
+            path,
             sample_rate,
             channels,
-            duration,
-        }
+            duration: Duration::from_secs(0),
+            title: None,
+            artist: None,
+            album: None,
+            year: None,
+        };
+        song.parse_metadata().expect("Metadata parsing failed");
+        song
     }
+
+    fn parse_metadata(&mut self) -> Result<(), Box<dyn Error>> {
+        let tagged_file = read_from_path(&self.path)?;
+        let tag = match tagged_file.primary_tag() {
+            Some(primary_tag) => primary_tag,
+            None => tagged_file.first_tag().expect("ERROR: No tags found!"),
+        };
+        let properties = tagged_file.properties();
+        self.duration = properties.duration();
+
+        self.title = Some(tag.title().as_deref().unwrap_or("None").to_string());
+        self.artist = Some(tag.artist().as_deref().unwrap_or("None").to_string());
+        self.album = Some(tag.album().as_deref().unwrap_or("None").to_string());
+        self.year = Some(tag.title().as_deref().unwrap_or("None").to_string());
+
+
+        // let tag = Tag::read_from_path(&self.path)?;
+        // if let Some(title) = tag.title() {
+        //     self.title = Some(title.to_string());
+        // } else {
+        //     self.title = Some(self.path.file_stem().unwrap().to_str().unwrap().to_string());
+        // }
+        // if let Some(artist) = tag.artist() {
+        //     self.artist = Some(artist.to_string());
+        // }
+        // if let Some(album) = tag.album() {
+        //     self.album = Some(album.to_string());
+        // } else {
+        //     self.album = self.title.clone();
+        // }
+        // if let Some(year) = tag.year() {
+        //     self.year = Some(year.to_string());
+        // }
+        // TODO: get album cover
+        Ok(())
+    }
+    fn create_source(&self) -> Decoder<BufReader<File>> {
+        let file = File::open(&self.path).unwrap();
+        let buf_reader = BufReader::new(file);
+        Decoder::new(buf_reader).unwrap()
+    }
+    fn get_filename(&self) -> &str {
+        self.path.file_name().unwrap().to_str().unwrap()
+    }
+    fn get_title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+    fn get_artist(&self) -> Option<&str> {
+        self.artist.as_deref()
+    }
+    fn get_album(&self) -> Option<&str> {
+        self.album.as_deref()
+    }
+    fn get_year(&self) -> Option<&str> {
+        self.year.as_deref()
+    }
+
+
 }
 
 struct Player {
@@ -57,19 +144,95 @@ struct Player {
     volume: f32,
     /// Current position in the song, in ms
     position: f64,
-    /// Total duration of the song, in ms
-    duration: f64,
     /// Whether the audio is playing or paused
     playing: bool,
-    /// Metadata of the song
-    audio_metadata: HashMap<String, String>,
     /// Loop type
     loop_type: LoopType,
     /// Whether the playlist is shuffled
     shuffle: bool,
+    /// Directory of the current playlist/folder
+    folder_dir: String,
+    /// Queue of songs to play
+    queue: VecDeque<Song>,
+    /// Current song being played
+    current_song: Option<Song>,
 }
 
 impl Player {
+    /// Checks if the current song has finished playing
+    fn update_current_song(&mut self) {
+        // check if the sink is empty (song finished)
+        if self.sink.empty() {
+            match self.loop_type {
+                LoopType::None => {
+                    // if queue is empty, stop playing
+                    if self.queue.is_empty() {
+                        self.playing = false;
+                        self.sink.stop();
+                        self.current_song = None;
+                        return;
+                    } else {
+                        // load next song
+                        if let Some(next_song) = self.queue.pop_front() {
+                            self.current_song = Some(next_song);
+                            if let Some(ref song) = self.current_song {
+                                self.sink.append(song.create_source());
+                            }
+                            self.on_song_change();
+                        }
+                        self.on_song_change();
+                    }
+                }
+
+                LoopType::LoopOne => {
+                    // load the same song again
+                    if let Some(ref song) = self.current_song {
+                        self.sink.append(song.create_source());
+                    }
+                    self.on_song_change();
+                }
+
+                LoopType::Loop => {
+                    // add current song to the end of the queue
+                    if let Some(ref song) = self.current_song {
+                        self.queue.push_back(song.clone());
+                    }
+                    // load next song
+                    if let Some(next_song) = self.queue.pop_front() {
+                        self.current_song = Some(next_song);
+                        if let Some(ref song) = self.current_song {
+                            self.sink.append(song.create_source());
+                        }
+                        self.on_song_change();
+                    }
+                }
+            }
+
+            // if queue is not empty, load next song
+
+        }
+    }
+    /// A callback that gets executed when the song changes.
+    fn on_song_change(&self) {
+        if let Some(song) = self.get_current_song() {
+            // do something? maybe?
+        }
+    }
+    /// Returns a list of songs in the current playlist/folder
+    fn get_songs_list(&self) -> Vec<Song> {
+        let mut songs = Vec::new();
+        for entry in fs::read_dir(&self.folder_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("mp3") {
+                songs.push(Song::new(path));
+            }
+        }
+        songs
+    }
+    fn skip(&mut self) {
+        self.sink.stop();
+    }
     fn set_playback_speed(&mut self, speed: f32) {
         let speed = speed.max(0.5).min(2.0);
         self.playback_speed = speed;
@@ -92,11 +255,8 @@ impl Player {
     fn get_position(&self) -> f64 {
         self.position
     }
-    fn set_duration(&mut self, duration: f64) {
-        self.duration = duration;
-    }
     fn get_duration(&self) -> f64 {
-        self.duration
+        self.current_song.as_ref().map_or(0.0, |song| song.duration.as_secs_f64())
     }
     /// Toggles the playback status of the Player
     fn toggle_playing(&mut self) {
@@ -122,12 +282,18 @@ impl Player {
     fn is_playing(&self) -> bool {
         self.playing
     }
+    fn get_current_song(&self) -> Option<&Song> {
+        self.current_song.as_ref()
+    }
 }
 
 enum LoopType {
-    None, // No loop
-    Loop, // Loop the playlist
-    LoopOne // Loop the current song
+    /// No loop
+    None,
+    /// Loop the playlist
+    Loop,
+    /// Loop the current song
+    LoopOne,
 }
 
 struct App {
@@ -146,42 +312,60 @@ impl App {
         let (_stream, stream_handle) = OutputStream::try_default().unwrap();
         let sink = Sink::try_new(&stream_handle).unwrap();
 
-        let file = BufReader::new(File::open("audio.mp3").unwrap());
-        // Decode that sound file into a source
-        let source = Decoder::new(file).unwrap();
-        sink.append(source);
-
-        sink.set_speed(1.0);
-        sink.set_volume(0.2);
-        sink.play();
-
-        Self {
+        let mut app = Self {
             _stream,
             // init player with default settings
             player: Player {
                 sink,
                 playback_speed: 1.0,
-                volume: 0.2,
+                volume: 0.05,
                 position: 0.0,
-                duration: 0.0,
-                playing: true,
-                audio_metadata: HashMap::new(),
-                loop_type: LoopType::None,
+                playing: false,
+                loop_type: LoopType::Loop,
                 shuffle: false,
+                folder_dir: String::new(),
+                queue: VecDeque::new(),
+                current_song: None,
             },
             start_time: Instant::now(),
             last_frame_time: Instant::now(),
             fps: 0.0,
             frame_times: VecDeque::new(),
             exit: false,
+        };
+        app.initialize();
+        app
+    }
+
+    fn initialize(&mut self) {
+        // init - subject to change
+        let folder = fs::canonicalize("songs").unwrap();
+        self.player.folder_dir = folder.clone().to_str().unwrap().to_string();
+        let songs = self.player.get_songs_list();
+
+        // add songs to queue
+        for song in songs {
+            self.player.queue.push_back(song);
         }
+        // play first song
+        if let Some(song) = self.player.queue.pop_front() {
+            self.player.current_song = Some(song);
+            if let Some(ref song) = self.player.current_song {
+                self.player.sink.append(song.create_source());
+            }
+            self.player.on_song_change();
+        }
+
+        self.player.sink.set_speed(self.player.get_playback_speed());
+        self.player.sink.set_volume(self.player.get_volume());
+        self.player.sink.play();
+        self.player.playing = true;
     }
 
     pub fn run(mut self, mut terminal: DefaultTerminal) -> io::Result<()> {
         self.last_frame_time = Instant::now();
         self.frame_times = VecDeque::new();
         while !self.exit {
-            let elapsed: f64 = self.start_time.elapsed().as_secs_f64();
             let now = Instant::now();
             let frame_duration = now.duration_since(self.last_frame_time).as_secs_f64();
             self.last_frame_time = now;
@@ -191,10 +375,14 @@ impl App {
             while self.frame_times.len() > 1 && self.frame_times.iter().sum::<f64>() > 3.0 {
                 self.frame_times.pop_front();
             }
-
             // calculate the average FPS
             let total_time: f64 = self.frame_times.iter().sum();
             self.fps = self.frame_times.len() as f64 / total_time;
+
+            self.player.update_current_song();
+
+            // song position
+            self.player.position = self.player.sink.get_pos().as_secs_f64();
 
             terminal.draw(|frame| self.draw(frame))?;
             self.handle_events()?;
@@ -227,20 +415,32 @@ impl App {
                 self.player.toggle_playing();
             }
             KeyCode::Up => {
-                let volume = self.player.get_volume() + 0.1;
+                let volume = self.player.get_volume() + 0.01;
                 self.player.set_volume(volume);
             }
             KeyCode::Down => {
-                let volume = self.player.get_volume() - 0.1;
+                let volume = self.player.get_volume() - 0.01;
                 self.player.set_volume(volume);
             }
             KeyCode::Char('o') => {
-                let speed = self.player.get_playback_speed() - 0.1;
+                let speed = self.player.get_playback_speed() - 0.05;
                 self.player.set_playback_speed(speed);
             }
             KeyCode::Char('p') => {
-                let speed = self.player.get_playback_speed() + 0.1;
+                let speed = self.player.get_playback_speed() + 0.05;
                 self.player.set_playback_speed(speed);
+            }
+            KeyCode::Enter => {
+                // skip
+                self.player.skip();
+            }
+            KeyCode::Char('l') => {
+                let loop_type = match self.player.loop_type {
+                    LoopType::None => LoopType::Loop,
+                    LoopType::Loop => LoopType::LoopOne,
+                    LoopType::LoopOne => LoopType::None,
+                };
+                self.player.loop_type = loop_type;
             }
             _ => {}
         }
@@ -287,7 +487,7 @@ impl App {
 
 
         let main_title = Line::from(vec![
-            Span::raw(" tylersfoot's audio player | "),
+            Span::raw(" doob audio player | "),
             Span::raw("HxW: "),
             Span::styled(format!("{}x{}", main.width, main.height), Style::default().fg(Color::Yellow)),
             Span::raw(" | FPS: "),
@@ -327,7 +527,6 @@ impl App {
         ]).areas(block_top);
 
         frame.render_widget(
-            // multiline text
             self.player_content(block_player.width as usize, block_player.height as usize)
                 .block(default_block(" Player ")),
             block_player,
@@ -340,9 +539,14 @@ impl App {
         frame.render_widget(Block::bordered()
                                 .title(" File Picker ")
                                 .title_alignment(Alignment::Center), block_file_picker);
-        frame.render_widget(Block::bordered()
-                                .title(" Queue ")
-                                .title_alignment(Alignment::Center), block_queue);
+        // frame.render_widget(Block::bordered()
+        //                         .title(" Queue ")
+        //                         .title_alignment(Alignment::Center), block_queue);
+        frame.render_widget(
+            self.queue_content(block_queue.width as usize, block_queue.height as usize)
+                .block(default_block(" Queue ")),
+            block_queue,
+        );
 
         let [block_telly, block_osc] = Layout::vertical([
             Constraint::Percentage(50),
@@ -357,7 +561,6 @@ impl App {
             block_telly.width as usize - 2,
             block_telly.height as usize - 2
         );
-
         frame.render_widget(
             Paragraph::new(sine_wave)
                 .alignment(Alignment::Left)
@@ -365,21 +568,130 @@ impl App {
                 .block(default_block(" Meow ")),
             block_telly,
         );
+    }
 
+    fn queue_content(&self, width: usize, height: usize) -> Paragraph {
+        // loop playlist, add current song to end
+        // loop song, show playing song as next
+
+        // let mut queue = &self.player.queue;
+        let mut local_queue = self.player.queue.clone();
+        let mut lines = Vec::new();
+        match self.player.loop_type {
+            LoopType::None => {
+                let pad = (width - 10) / 2;
+                let line = Line::from(vec![
+                    Span::styled(format!("{:pad$}{}", "", "Loop: ", pad = pad), Style::default().fg(Color::LightRed)),
+                    Span::styled("None", Style::default().fg(Color::LightYellow)),
+                ]);
+                lines.push(line);
+            }
+            LoopType::Loop => {
+                let pad = (width - 14) / 2;
+                let line = Line::from(vec![
+                    Span::styled(format!("{:pad$}{}", "", "Loop: ", pad = pad), Style::default().fg(Color::LightRed)),
+                    Span::styled("Playlist", Style::default().fg(Color::LightYellow)),
+                ]);
+                lines.push(line);
+            }
+            LoopType::LoopOne => {
+                let pad = (width - 10) / 2;
+                let line = Line::from(vec![
+                    Span::styled(format!("{:pad$}{}", "", "Loop: ", pad = pad), Style::default().fg(Color::LightRed)),
+                    Span::styled("Song", Style::default().fg(Color::LightYellow)),
+                ]);
+                lines.push(line);
+
+                // clear the local queue and add the current song only
+                local_queue.clear();
+                if let Some(song) = &self.player.current_song {
+                    local_queue.push_back(song.clone());
+                }
+            }
+        }
+
+        let max = 22; // max num of songs to show
+        for (i, song) in local_queue.iter().enumerate() {
+            if i >= max {
+                lines.push(Line::from(Span::styled("      ...", Style::default().fg(Color::LightCyan))));
+                break;
+            }
+
+            let title = song.get_title().unwrap_or("--").to_string();
+            let artist = song.get_artist().unwrap_or("--").to_string();
+
+            if i == 0 {
+                lines.push(Line::from(Span::raw(" ")));
+                let line = Line::from(vec![
+                    Span::styled("   Next: ", Style::default().fg(Color::LightRed)),
+                    Span::styled(title, Style::default().fg(Color::LightCyan)),
+                    Span::styled(" - ", Style::default().fg(Color::White)),
+                    Span::styled(artist, Style::default().fg(Color::LightYellow)),
+                ]);
+                lines.push(line);
+                lines.push(Line::from(Span::raw(" ")));
+            } else {
+                let line = Line::from(vec![
+                    Span::styled(format!("  {:2}. ", i + 1), Style::default().fg(Color::LightRed)),
+                    Span::styled(title, Style::default().fg(Color::LightCyan)),
+                    Span::styled(" - ", Style::default().fg(Color::White)),
+                    Span::styled(artist, Style::default().fg(Color::LightYellow)),
+                ]);
+                lines.push(line);
+            }
+        }
+
+        Paragraph::new(Text { lines, ..Default::default() })
+            .alignment(Alignment::Left)
     }
 
     fn player_content(&self, width: usize, height: usize) -> Paragraph {
-
-        let volume = format!("{:.2} ", self.player.get_volume());
+        let position = format!("{:.2}", self.player.get_position());
+        let duration = format!("{:.2}", self.player.get_duration());
+        let volume = format!("{:.2}", self.player.get_volume());
         let playing = self.player.is_playing().to_string();
-        let speed = format!("{:.2} ", self.player.get_playback_speed());
+        let mut folder = self.player.folder_dir.to_string();
+        if folder.len() >= 20 {
+            folder = format!("~{}", &folder[folder.len() - 20..])
+        }
+        let face = if self.player.is_playing() { "d-_-b" } else { "do_ob" };
+        let speed = format!("{:.2}", self.player.get_playback_speed());
+        let loop_type = match self.player.loop_type {
+            LoopType::None => "none",
+            LoopType::Loop => "loop",
+            LoopType::LoopOne => "loop_one",
+        };
+        let shuffle = self.player.shuffle.to_string();
+        let mut sample_rate = "--".to_string();
+        let mut channels = "--".to_string();
+        let mut title = "--";
+        let mut artist = "--";
+        let mut album = "--";
+        let mut year = "--";
+
+        if self.player.current_song.is_some() {
+            sample_rate = format!("{:.2}khz", self.player.current_song.as_ref().unwrap().sample_rate);
+            channels = format!("{:.2}", self.player.current_song.as_ref().unwrap().channels);
+            title = self.player.current_song.as_ref().unwrap().get_title().unwrap_or("--");
+            artist = self.player.current_song.as_ref().unwrap().get_artist().unwrap_or("--");
+            album = self.player.current_song.as_ref().unwrap().get_album().unwrap_or("--");
+            year = self.player.current_song.as_ref().unwrap().get_year().unwrap_or("--");
+        }
+
+        let queue = self.player.queue.len().to_string();
 
         let content_lines: Vec<Line> = vec![
             // Line::from(Span::raw("test")),
-            Line::from(Span::styled("meow hi umm meow", Style::default().fg(Color::White))),
-            Line::from(Span::styled("d-_-b", Style::default().fg(Color::LightMagenta))),
+            Line::from(Span::styled(face, Style::default().fg(Color::LightMagenta))),
             Line::from(Span::raw(" ")),
-            // Line::from(Span::raw(self.player.sink.source().sample_rate().to_string())),
+            Line::from(vec![
+                Span::styled("position: ", Style::default().fg(Color::White)),
+                Span::styled(position, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("duration: ", Style::default().fg(Color::White)),
+                Span::styled(duration, Style::default().fg(Color::Yellow)),
+            ]),
             Line::from(Span::raw(" ")),
             Line::from(vec![
                 Span::styled("playing: ", Style::default().fg(Color::White)),
@@ -393,6 +705,50 @@ impl App {
                 Span::styled("speed: ", Style::default().fg(Color::White)),
                 Span::styled(speed, Style::default().fg(Color::Yellow)),
             ]),
+            Line::from(vec![
+                Span::styled("loop type: ", Style::default().fg(Color::White)),
+                Span::styled(loop_type, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("shuffle: ", Style::default().fg(Color::White)),
+                Span::styled(shuffle, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("folder: ", Style::default().fg(Color::White)),
+                Span::styled(folder, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(Span::raw(" ")),
+            Line::from(vec![
+                Span::styled("sample rate: ", Style::default().fg(Color::White)),
+                Span::styled(sample_rate, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("channels: ", Style::default().fg(Color::White)),
+                Span::styled(channels, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(Span::raw(" ")),
+            Line::from(vec![
+                Span::styled("title: ", Style::default().fg(Color::White)),
+                Span::styled(title, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("artist: ", Style::default().fg(Color::White)),
+                Span::styled(artist, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("album: ", Style::default().fg(Color::White)),
+                Span::styled(album, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(vec![
+                Span::styled("year: ", Style::default().fg(Color::White)),
+                Span::styled(year, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(Span::raw(" ")),
+            Line::from(vec![
+                Span::styled("queue length: ", Style::default().fg(Color::White)),
+                Span::styled(queue, Style::default().fg(Color::Yellow)),
+            ]),
+            Line::from(Span::raw("⏵ ⏸ ⏹ ⏭ ⏮ ⏴ ⏪ ⏩ 🔀 🔁 🔂 🔄")),
         ];
 
         let content_height = content_lines.len();
@@ -417,8 +773,6 @@ impl App {
 
         for y in 0..height {
             for x in 0..width {
-                // let taper_factor = 1.0 - (x as f64 / width as f64 * 2.0 - 1.0).abs();
-                // let value = (x as f64 * frequency + time).sin() * taper_factor;
                 let value = (x as f64 * frequency + time).sin();
                 let scaled_value = ((value + 1.0) * (height as f64 / 2.3)).round() as usize;
                 if scaled_value == y {
@@ -439,3 +793,21 @@ fn default_block(title: &str) -> Block {
         .title(title)
         .title_alignment(Alignment::Center)
 }
+
+/*
+todo
+- limit to 175x50?
+- add cool background if bigger than that
+- queue right hand padding, maybe cut off name to write artist?
+
+
+known issues
+- switch loop back to playlist doesn't add old songs
+- switching speed doesnt update position right
+- audio stuttering???
+
+
+other
+⏵ ⏸ ⏹ ⏭ ⏮ ⏴ ⏪ ⏩ 🔀 🔁 🔂 🔄
+
+ */

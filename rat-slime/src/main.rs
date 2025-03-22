@@ -1,25 +1,23 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{VecDeque};
 use color_eyre::Result;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
-    layout::{Constraint, Layout, Position},
-    style::{Color, Modifier, Style, Stylize},
+    layout::{Constraint, Layout},
+    style::{Color, Style, Stylize},
     text::{Line, Span, Text},
-    widgets::{Block, List, ListItem, Paragraph, Borders},
+    widgets::{Block, Paragraph, Borders},
     DefaultTerminal, Frame,
 };
 use std::fs::File;
 use std::{fs, io};
 use std::error::Error;
 use std::io::BufReader;
-use std::path::Path;
 use std::time::{Duration, Instant};
 use crossterm::event::KeyEvent;
-use ratatui::layout::{Alignment, Direction, Rect};
+use ratatui::layout::{Alignment, Rect};
 use rodio::{Decoder, OutputStream, Sink};
-use rodio::source::{ChannelVolume, SineWave, Source};
-use id3::{Tag, TagLike};
-use image::io::Reader as ImageReader;
+use rodio::source::{Source};
+use id3::{TagLike};
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::prelude::Accessor;
 use lofty::read_from_path;
@@ -88,27 +86,8 @@ impl Song {
         self.title = Some(tag.title().as_deref().unwrap_or("None").to_string());
         self.artist = Some(tag.artist().as_deref().unwrap_or("None").to_string());
         self.album = Some(tag.album().as_deref().unwrap_or("None").to_string());
-        self.year = Some(tag.title().as_deref().unwrap_or("None").to_string());
+        self.year = Some(tag.year().unwrap_or(0).to_string());
 
-
-        // let tag = Tag::read_from_path(&self.path)?;
-        // if let Some(title) = tag.title() {
-        //     self.title = Some(title.to_string());
-        // } else {
-        //     self.title = Some(self.path.file_stem().unwrap().to_str().unwrap().to_string());
-        // }
-        // if let Some(artist) = tag.artist() {
-        //     self.artist = Some(artist.to_string());
-        // }
-        // if let Some(album) = tag.album() {
-        //     self.album = Some(album.to_string());
-        // } else {
-        //     self.album = self.title.clone();
-        // }
-        // if let Some(year) = tag.year() {
-        //     self.year = Some(year.to_string());
-        // }
-        // TODO: get album cover
         Ok(())
     }
     fn create_source(&self) -> Decoder<BufReader<File>> {
@@ -539,9 +518,6 @@ impl App {
         frame.render_widget(Block::bordered()
                                 .title(" File Picker ")
                                 .title_alignment(Alignment::Center), block_file_picker);
-        // frame.render_widget(Block::bordered()
-        //                         .title(" Queue ")
-        //                         .title_alignment(Alignment::Center), block_queue);
         frame.render_widget(
             self.queue_content(block_queue.width as usize, block_queue.height as usize)
                 .block(default_block(" Queue ")),
@@ -799,7 +775,7 @@ todo
 - limit to 175x50?
 - add cool background if bigger than that
 - queue right hand padding, maybe cut off name to write artist?
-
+- add album cover
 
 known issues
 - switch loop back to playlist doesn't add old songs

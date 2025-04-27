@@ -1,12 +1,19 @@
+#!.\.venv\Scripts\python.exe
+
 from PIL import Image, ImageDraw, ImageFont, ImageChops
 from fontTools.ttLib import TTFont
 from fontTools.unicode import Unicode
 import time
-from os import listdir
+import os
 from os.path import isfile, join
+import sys
+import tkinter as tk
+from tkinter import filedialog
+import cv2
 
 # with open("character_brightness.txt", "w", encoding="utf-8") as f:
 
+# C:\Windows\Fonts
 
 
 
@@ -88,7 +95,7 @@ def process_character_images():
     brightness_data_path = "character_brightness.txt"
     brightness_data = ""
     
-    files = [f for f in listdir(image_folder_path) if (isfile(join(image_folder_path, f)) and f.endswith('.png'))]
+    files = [f for f in os.listdir(image_folder_path) if (isfile(join(image_folder_path, f)) and f.endswith('.png'))]
     # files.sort()
     file_count = len(files)
     c = 0 # counter
@@ -148,16 +155,100 @@ def tester():
             f2.write(data2)
             
     print("Sorted character brightness data written to character_brightness_sorted.txt")
+    
+
+def process_font_data(font_path: str) -> bool:
+    # process the given font, render character images, calculate brightness,
+    # and save results
+    return True       
+           
+           
+def clear_temp():
+    # clear the temp folder
+    temp_folder = "temp/"
+    if not os.path.exists(temp_folder):
+        os.makedirs(temp_folder)
+    for f in os.listdir(temp_folder):
+        file_path = os.path.join(temp_folder, f)
+        try:
+            if os.path.isfile(file_path) and file_path.endswith('.png'):
+                os.remove(file_path)
+        except Exception as e:
+            print(f'Failed to delete {file_path}. Reason: {e}')     
+                   
+
+           
+def check_video(file_path: str) -> bool: 
+    # check if the file is a valid video file
+    if file_path.endswith((".mp4", ".mov", ".webm", ".mkv", ".wmv", ".avi," ".flv", ".mpeg", ".movie", ".m4v")):
+        capture = cv2.VideoCapture(file_path)
+        opened = capture.isOpened()
+        capture.release()
+        return opened
+    return False
             
+            
+def main():
+    
+    settings = {
+        # input video properties
+        "input_video_path": "",
+        "input_video_size": [0, 0], # w, h in px
+        "input_video_fps": 0,
+        "input_video_frames": 0,
+        # font properties
+        "font_path": "./jetbrainsmono-regular.ttf",
+        "font_size": 200,
+        # console settings
+        "console_width": 100,
+        "console_height": 30,
+        # export/output video settings
+        "output_video_path": "output/output.mp4",
+        "output_video_size": [0, 0], # w, h in px
+        "output_video_fps": 30,
+        "output_video_font_path": "./jetbrainsmono-regular.ttf",
+        "output_video_font_size": 200,
+        
+        
+    }
+    
+    root = tk.Tk()
+    root.withdraw()
+
+    if len(sys.argv) == 2:
+        video_path = sys.argv[1]
+    elif len(sys.argv) > 2:
+        print("Multiple files detected, only the first one will be used.")
+        video_path = sys.argv[1]
+    else:
+        print("Please select a video file:")
+        video_path = filedialog.askopenfilename()
 
 
-if __name__=="__main__":
-    # generate_character_images()
-    process_character_images()
-    tester()
-    # font = TTFont('./jetbrainsmono-regular.ttf')
-    # for table in font['cmap'].tables:
-    #     print(f"Platform: {table.platformID}, Encoding: {table.platEncID}, Entries: {len(table.cmap)}")
+    while check_video(video_path) == False:
+        print("Invalid video file, please select a valid video file:")
+        video_path = filedialog.askopenfilename()
+        
+    
+    
+    
+    print(video_path)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    input("Script over! Press Enter to exit...")
+   
+    
+# generate_character_images()
+# process_character_images()
+# tester()
+# font = TTFont('./jetbrainsmono-regular.ttf')
+# for table in font['cmap'].tables:
+#     print(f"Platform: {table.platformID}, Encoding: {table.platEncID}, Entries: {len(table.cmap)}")
+
 
 
 # bbmaxX = 0

@@ -8,12 +8,12 @@ import os
 from os.path import isfile, join
 import sys
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import ttk, filedialog, simpledialog
+from tkinter import font as tkfont
 import cv2
+import winreg
 
 # with open("character_brightness.txt", "w", encoding="utf-8") as f:
-
-# C:\Windows\Fonts
 
 
 
@@ -96,15 +96,11 @@ def process_character_images():
     brightness_data = ""
     
     files = [f for f in os.listdir(image_folder_path) if (isfile(join(image_folder_path, f)) and f.endswith('.png'))]
-    # files.sort()
+
     file_count = len(files)
     c = 0 # counter
     print(f"\nProcessing {file_count} character images...\n")
     for file in files:
-# 008988-0x0231c.png
-# 008989-0x0231d.png
-# 008990-0x0231e.png
-
         image = Image.open(image_folder_path + file)
         image = image.convert("L") # convert to grayscale, just in case
         total_brightness = 0
@@ -155,41 +151,143 @@ def tester():
             f2.write(data2)
             
     print("Sorted character brightness data written to character_brightness_sorted.txt")
+
     
 
-def process_font_data(font_path: str) -> bool:
-    # process the given font, render character images, calculate brightness,
-    # and save results
-    return True       
-           
-           
+def process_font(font_path: str) -> bool:
+    # process the given font, render character images,
+    # calculate brightness, and save results
+    return True
+
+
+def check_processed_font(font_path: str) -> bool:
+    # checks if a font has been processed into brightness data
+    path = os.path.join(settings["script_path"], "fonts", "data", font_path.split("/")[-1].split(".")[0] + ".txt")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            if len(lines) > 0:
+                return True
+    return False
+
+     
+def get_video_properties(file_path: str) -> dict:
+    # get video properties using OpenCV
+    capture = cv2.VideoCapture(file_path)
+    if not capture.isOpened():
+        return None
+    
+    properties = {
+        "width": int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        "height": int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        "fps": int(capture.get(cv2.CAP_PROP_FPS)),
+        "frames": int(capture.get(cv2.CAP_PROP_FRAME_COUNT)),
+    }
+    
+    capture.release()
+    return properties
+
+
+def get_installed_fonts():
+    # gets the pc's installed fonts from the registry
+    # copies fonts to local folder for use
+    fonts = {}
+    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts") as key:
+        for i in range(0, winreg.QueryInfoKey(key)[1]):
+            name, path, _ = winreg.EnumValue(key, i)
+            fonts[name] = os.path.join(r"C:/Windows/Fonts", path)
+    # filter fonts to TrueType, clean names
+    fonts = {k: v for k, v in fonts.items() if (v.endswith((".ttf", ".ttc", ".otf")) and "TrueType" in k)}
+    fonts = {(k.replace(" (TrueType)", "")): v for k, v in fonts.items()}
+    
+    # copy fonts to folder
+    fonts_path = os.path.join(settings["script_path"], "fonts", "raw")
+    if not os.path.exists(fonts_path):
+        os.makedirs(fonts_path)
+    for name, path in fonts.items():
+        if not os.path.exists(fonts_path + "/" + name + path[-4:]):
+            try:
+                with open(path, "rb") as f:
+                    with open(fonts_path + "/" + name + path[-4:], "wb") as f2:
+                        f2.write(f.read())
+            except Exception as e:
+                print(f"Failed to copy font {name} from path {path} to {fonts_path + "/" + name + path[-4:]}: {e}")
+                
+    # fonts list with local paths
+    fonts_local = {}
+    for name, path in fonts.items():
+        fonts_local[name] = name + path[-4:]
+    return fonts_local
+
 def clear_temp():
-    # clear the temp folder
-    temp_folder = "temp/"
-    if not os.path.exists(temp_folder):
-        os.makedirs(temp_folder)
-    for f in os.listdir(temp_folder):
-        file_path = os.path.join(temp_folder, f)
+    # create/clear the temp folder
+    temp_path = os.path.join(settings["script_path"], "temp")
+    if not os.path.exists(temp_path):
+        os.makedirs(temp_path)
+    for f in os.listdir(temp_path):
+        file_path = os.path.join(temp_path, f)
         try:
             if os.path.isfile(file_path) and file_path.endswith('.png'):
                 os.remove(file_path)
         except Exception as e:
-            print(f'Failed to delete {file_path}. Reason: {e}')     
-                   
+            print(f'Failed to delete {file_path}. Reason: {e}')
 
-           
-def check_video(file_path: str) -> bool: 
-    # check if the file is a valid video file
+
+def verify_font(font_path: str) -> bool:
+    # check if the font file is valid
+    if os.path.exists(font_path) and font_path.endswith((".ttf", ".otf")):
+        try:
+            TTFont(font_path)
+            return True
+        except Exception as e:
+            return False
+    return False
+
+
+def verify_video(file_path: str) -> bool: 
+    # check if the file is a valid video file using OpenCV
     if file_path.endswith((".mp4", ".mov", ".webm", ".mkv", ".wmv", ".avi," ".flv", ".mpeg", ".movie", ".m4v")):
         capture = cv2.VideoCapture(file_path)
         opened = capture.isOpened()
         capture.release()
         return opened
     return False
-            
-            
+
+
+
+
+
+class FontChooser(simpledialog.Dialog):
+    # class to create the font chooser window
+    def body(self, master):
+        # get monospaced fonts
+        fonts = sorted(f for f in tkfont.families()
+                if tkfont.Font(family=f).metrics('fixed'))
+        
+        # font list
+        ttk.Label(master, text="font:").grid(row=0, column=0, padx=5, pady=5)
+        self.combo = ttk.Combobox(master, values=fonts, state="readonly")
+        self.combo.set(fonts[0])
+        self.combo.grid(row=0, column=1, padx=5, pady=5)
+        # self.combo.bind("<<ComboboxSelected>>", self._update_preview)
+        self.combo.bind("<<ComboboxSelected>>", lambda event=None: self.preview_font.configure(family=self.combo.get()))
+        
+        # font preview
+        self.preview_font = tkfont.Font(family=fonts[0], size=20)
+        self.preview = ttk.Label(
+            master, text="The quick brown fox", font=self.preview_font,
+            relief="groove", anchor="center"
+        )
+        self.preview.grid(row=1, column=0, columnspan=2, padx=5, pady=(0,10), sticky="ew")
+        return self.combo
+
+    def apply(self):
+        self.result = self.combo.get()
+
+
+
 def main():
-    
+    global settings
     settings = {
         # input video properties
         "input_video_path": "",
@@ -197,49 +295,113 @@ def main():
         "input_video_fps": 0,
         "input_video_frames": 0,
         # font properties
-        "font_path": "./jetbrainsmono-regular.ttf",
-        "font_size": 200,
-        # console settings
-        "console_width": 100,
-        "console_height": 30,
+        "font_path": "./jetbrainsmono-regular.ttf", # path to ttf/otf font
+        "font_size": 200, # for rendering
+        # terminal/console settings
+        "terminal_width": 100,
+        "terminal_height": 30,
         # export/output video settings
-        "output_video_path": "output/output.mp4",
+        "output_video_path": "", # where rendered video will be saved
         "output_video_size": [0, 0], # w, h in px
-        "output_video_fps": 30,
-        "output_video_font_path": "./jetbrainsmono-regular.ttf",
-        "output_video_font_size": 200,
-        
-        
+        "output_video_fps": 0,
+        # path to this python file
+        "script_path": os.path.dirname(os.path.abspath(__file__)),
     }
     
+
     root = tk.Tk()
     root.withdraw()
+    
+    font = FontChooser(root, title="Choose a monospaced font").result
+    print("You picked:", font)
 
-    if len(sys.argv) == 2:
-        video_path = sys.argv[1]
-    elif len(sys.argv) > 2:
-        print("Multiple files detected, only the first one will be used.")
-        video_path = sys.argv[1]
-    else:
-        print("Please select a video file:")
-        video_path = filedialog.askopenfilename()
+     
 
+    
+    
+    # # get video path
+    # if len(sys.argv) == 2:
+    #     settings["input_video_path"] = sys.argv[1]
+    # elif len(sys.argv) > 2:
+    #     print("Multiple files detected, only the first one will be used.")
+    #     settings["input_video_path"] = sys.argv[1]
+    # else:
+    #     print("Please select a video file:")
+    #     settings["input_video_path"] = filedialog.askopenfilename(
+    #         filetypes=[("Video files", "*.mp4;*.mov;*.webm;*.mkv;*.wmv;*.avi;*.flv;*.mpeg;*.movie;*.m4v")],
+    #         title="Select a video file",
+    #     )
 
-    while check_video(video_path) == False:
-        print("Invalid video file, please select a valid video file:")
-        video_path = filedialog.askopenfilename()
+    # while verify_video(settings["input_video_path"]) == False:
+    #     print("Invalid video file, please select a valid video file:")
+    #     settings["input_video_path"] = filedialog.askopenfilename(
+    #         filetypes=[("Video files", "*.mp4;*.mov;*.webm;*.mkv;*.wmv;*.avi;*.flv;*.mpeg;*.movie;*.m4v")],
+    #         title="Select a video file",
+    #     )
+    # print(f"Video path selected: {settings["input_video_path"]}")
+    # # get video properties
+    # video_properties = get_video_properties(settings["input_video_path"])
+    # if video_properties is not None:
+    #     settings["input_video_size"] = [video_properties["width"], video_properties["height"]]
+    #     settings["input_video_fps"] = video_properties["fps"]
+    #     settings["input_video_frames"] = video_properties["frames"]
+    # else:
+    #     ValueError("Could not extract video properties.")
+    #     return
+    # print(f"Video properties: {settings['input_video_size'][0]}x{settings['input_video_size'][1]} @ {settings['input_video_fps']} fps, {settings['input_video_frames']} frames")
+    
+    
+    # get_installed_fonts()
+    
+    # print("Please select a font:")
+    # # NOTE: i have to do this fucking stdout devnull shit bc windows left a stray printf in comdlg32.dll
+    # fd = os.dup(1)
+    # with open(os.devnull, 'w') as dn:
+    #     os.dup2(dn.fileno(), 1) # redirect stdout to null
+    #     settings["font_path"] = filedialog.askopenfilename(
+    #         filetypes=[("TrueType/OpenType Fonts", "*.ttf;*.ttc;*.otf")],
+    #         title="Select a font",
+    #         initialdir=os.path.join(settings["script_path"], "fonts", "raw"),
+    #     )
+    # os.dup2(fd, 1) 
+    # os.close(fd)
+
+    # while verify_font(settings["font_path"]) == False:
+    #     print("Invalid font, please select a valid font:")
+    #     fd = os.dup(1) 
+    #     with open(os.devnull, 'w') as dn:
+    #         os.dup2(dn.fileno(), 1) # redirect stdout to null
+    #         settings["font_path"] = filedialog.askopenfilename(
+    #             filetypes=[("TrueType/OpenType Fonts", "*.ttf;*.ttc;*.otf")],
+    #             title="Select a font",
+    #             initialdir=os.path.join(settings["script_path"], "fonts", "raw"),
+    #         )
+    #     os.dup2(fd, 1) 
+    #     os.close(fd)
+        
+    # print(f"Font selected: {settings["font_path"]}")
+    # # check if font has been processed
+    # if not check_processed_font(settings["font_path"]):
+    #     process_font(settings["font_path"])
+    #     print("Font processed!")
+    
+    # output video settings
+
         
     
     
     
-    print(video_path)
+
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
         print(f"An error occurred: {e}")
-    input("Script over! Press Enter to exit...")
+    for i in range(5, 0, -1):
+        print(f"Exiting in {i} seconds...", end="\r")
+        time.sleep(1)
+    os._exit(0)
    
     
 # generate_character_images()

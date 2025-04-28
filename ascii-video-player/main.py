@@ -1,239 +1,109 @@
 #!.\.venv\Scripts\python.exe
 
-from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageStat
-from fontTools.ttLib import TTFont
-from fontTools.unicode import Unicode
-import time
-import os
-from os.path import isfile, join
-import sys
+# stdlib
+import os, sys, ctypes, json, atexit
+from time import perf_counter, sleep
+
+# tkinter
 import tkinter as tk
-from tkinter import ttk, filedialog, simpledialog
-from tkinter import font as tkfont
+from tkinter import ttk, simpledialog, filedialog, font as tkfont
+
+# imaging
+from PIL import Image, ImageDraw, ImageFont, ImageStat
+from fontTools.ttLib import TTFont
+
+# video
 import cv2
-import winreg
-import ctypes
 from matplotlib import font_manager
-import atexit
-import json
 
-# with open("character_brightness.txt", "w", encoding="utf-8") as f:
+        
+        
+def sdir(*sub: any) -> str:
+    """Make a subdirectory from the script path."""
+    return os.path.join(settings["script_path"], *sub)
 
-
-def has_glyph(c, font):
-    # checks if the character will be rendered or
-    # if it will be 'tofu' (a square box)
-    for table in font['cmap'].tables:
-        if ord(c) in table.cmap.keys():
-            return True
-    return False
-
+def vdir(path):
+    """Ensure the directory exists."""
+    os.makedirs(path, exist_ok=True)
     
-def generate_character_images() -> bool:
-    start_time = time.time()
-    fontsize = 400 # resolution/size of the images
-    full_block_char = "█"
-
-    font = ImageFont.truetype(settings["font_path"], fontsize)
-    fontFT = TTFont(settings["font_path"]) # fontTools font, only used for has_glyph()
-    full_block_w = font.getbbox(full_block_char)[2]
-    full_block_h = font.getbbox(full_block_char)[3]
-    results = [0, 0, 0] # total, generated, skipped
     
-    # render tofu character to compare/mask against E000 alt
-    img_tofu = Image.new("RGB", (full_block_w, full_block_h), (0, 0, 0))
-    draw = ImageDraw.Draw(img_tofu)
-    draw.text((0, 0), chr(0x10FFFF), font=font, fill=(255, 255, 255))
+def progress_bar(i, total, size):
+    """Display a progress bar."""
+    pct = (i + 1) * 100 // total
+    bar = "=" * pct + " " * (size - pct)
+    print(f"\r[{bar}]  {i+1}/{total}  {pct}% ", end="")
+        
+    
+def generate_character_images():
+    """Generate character images from the given font."""
+    start = perf_counter()
+    
+    font_size = 200 # resolution/size of the images
+    font = ImageFont.truetype(settings["font_path"], font_size)
 
-    min = 0x0000
-    max = 0x110000 #0x110000 #0x20000
+    w, h = (font.getbbox("█")[2], font.getbbox("█")[3])
+
+    cmap = {}
+    for table in TTFont(settings["font_path"])["cmap"].tables:
+        cmap.update(table.cmap)
+    codepoints = sorted(cmap.keys())
+
+    total = len(codepoints)
+    step = max(1, total//400)
+    gen = 0
     print(f"\nGenerating characters...")
-    for i in range(min, max):
-        progress = int((results[0]) / (max-min) * 100)+1
-        bar = '=' * progress + ' ' * (100 - progress)
-        print(f'\r[{bar}]   {results[0]+1}/{(max-min)}    ', end='')
+    for i, cp in enumerate(codepoints): # cp = unicode codepoint (int)
+        c = chr(cp) # char
+        x0, y0, x1, y1 = font.getbbox(c)
         
-        results[0] += 1
-        c = chr(i) # char
-        h = "0x" + hex(ord(c))[2:].zfill(5) # unicode hex padded to 4 digits
-        bb = font.getbbox(c) # bounding box of the character
+        # if the character fits in the image
+        if (0 <= x0 < x1 <= w) and (0 <= y0 < y1 <= h):
+            img = Image.new("RGB", (w, h), "black")
+            ImageDraw.Draw(img).text((0, 0), c, font=font, fill="white")
+            img.save(sdir("temp", f"0x{cp:06X}.png"))
+            gen += 1
         
-        # flags for skipping:
-        if (
-            (not c.isprintable())
-            or (bb[0] < 0)
-            or (bb[1] < 0)
-            or (bb[2] > full_block_w)
-            or (bb[3] > full_block_h)
-            or (bb[0] == bb[2])
-            or (bb[1] == bb[3])
-            or (not has_glyph(c, fontFT))
-            ):
-            results[2] += 1
-            continue
-        
-        img_char = Image.new("RGB", (full_block_w, full_block_h), (0, 0, 0))
-        draw = ImageDraw.Draw(img_char)
-        draw.text((0, 0), c, font=font, fill=(255, 255, 255))
-        if ImageChops.difference(img_char, img_tofu).getbbox() is None:
-            # rendered as tofu, skip
-            results[2] += 1
-            continue
-        img_char.save(os.path.join(settings["script_path"], "temp", f"{h}.png"))
-        results[1] += 1
+        if (i % step == 0) or (i == total - 1):
+            progress_bar(i, total, 100)
     
-    print(f"\nSucessfully generated {str(results[1])}/{str(results[0])} characters! (" + str(round(time.time() - start_time, 2)) + "s)\n")
-    return True
+    print(f"\nSucessfully generated {gen}/{total} characters! ({perf_counter()-start:.2f}s)\n")
     
     
-# def generate_character_images_v2() -> bool:
-#     def verify_glyph(c, font):
-#         # uses various methods to check if the character
-#         # will be rendered (true) or if it should be skipped (false)
-#         ifnot c.isprintable()
-#         return True
-    
-#     start_time = time.time()
-#     fontsize = 400 # resolution/size of the images
-#     full_block_char = "█"
-
-#     font = ImageFont.truetype(settings["font_path"], fontsize)
-#     fontFT = TTFont(settings["font_path"]) # fontTools font, only used for has_glyph()
-#     full_block_w = font.getbbox(full_block_char)[2]
-#     full_block_h = font.getbbox(full_block_char)[3]
-#     results = [0, 0, 0] # total, generated, skipped
-    
-#     # render tofu character to compare/mask against E000 alt
-#     img_tofu = Image.new("RGB", (full_block_w, full_block_h), (0, 0, 0))
-#     draw = ImageDraw.Draw(img_tofu)
-#     draw.text((0, 0), chr(0x10FFFF), font=font, fill=(255, 255, 255))
-
-#     min = 0x0000
-#     max = 0x110000 #0x110000 #0x20000
-#     print(f"\nGenerating characters...")
-#     for i in range(min, max):
-#         progress = int((results[0]) / (max-min) * 100)+1
-#         bar = '=' * progress + ' ' * (100 - progress)
-#         print(f'\r[{bar}]   {results[0]+1}/{(max-min)}    ', end='')
-        
-#         results[0] += 1
-#         c = chr(i) # char
-#         h = "0x" + hex(ord(c))[2:].zfill(5) # unicode hex padded to 4 digits
-#         bb = font.getbbox(c) # bounding box of the character
-        
-#         if not verify_glyph(c, font):
-#             results[2] += 1
-#             continue
-        
-#         # flags for skipping:
-#         if (
-#             (not c.isprintable())
-#             or (bb[0] < 0)
-#             or (bb[1] < 0)
-#             or (bb[2] > full_block_w)
-#             or (bb[3] > full_block_h)
-#             or (bb[0] == bb[2])
-#             or (bb[1] == bb[3])
-#             or (not has_glyph(c, fontFT))
-#             ):
-#             results[2] += 1
-#             continue
-        
-#         img_char = Image.new("RGB", (full_block_w, full_block_h), (0, 0, 0))
-#         draw = ImageDraw.Draw(img_char)
-#         draw.text((0, 0), c, font=font, fill=(255, 255, 255))
-#         if ImageChops.difference(img_char, img_tofu).getbbox() is None:
-#             # rendered as tofu, skip
-#             results[2] += 1
-#             continue
-#         img_char.save(os.path.join(settings["script_path"], "temp", f"{h}_v2.png"))
-#         results[1] += 1
-    
-#     print(f"\nSucessfully generated {str(results[1])}/{str(results[0])} characters! (" + str(round(time.time() - start_time, 2)) + "s)\n")
-#     return True
-    
-    
-def process_character_images() -> bool:
+def process_character_images():
     def mean_brightness(path):
         with Image.open(path) as img:
             img = img.convert("L") # grayscale, just in case
             stat = ImageStat.Stat(img) # mean color value
             return stat.mean[0] / 255.0 
         
-    start_time = time.time()
-    image_folder_path = os.path.join(settings["script_path"], "temp")
-    font_data_folder_path = os.path.join(settings["script_path"], "font_data")
-    font_data_path = os.path.join(font_data_folder_path, f"{settings["font_name"]}_v2.json")
+    start = perf_counter()
+    image_folder_path = sdir("temp")
+    vdir(sdir("font_data"))
+    font_data_path = sdir("font_data", f"{settings["font_name"]}.json")
     brightness_data = {}
     
-    if not os.path.exists(font_data_folder_path):
-        os.makedirs(font_data_folder_path)
-    
-    files = [f for f in os.listdir(image_folder_path) if (isfile(os.path.join(image_folder_path, f)) and f.lower().endswith('.png'))]
+    files = [f for f in os.listdir(sdir("temp")) if (os.path.isfile(sdir("temp", f)) and f.lower().endswith('.png'))]
     
     file_count = len(files)
-    c = 0 # counter
+    step = max(1, file_count//400)
     print(f"Calculating font brightness...")
-    for file in files:
-        b = mean_brightness(os.path.join(image_folder_path, file))
+    for i, file in enumerate(files):
+        b = mean_brightness(sdir("temp", file))
         brightness_data[file[:-4]] = f"{b:.4f}"
         
-        c += 1
-        progress = int(c / file_count * 100)
-        bar = '=' * progress + ' ' * (100 - progress)
-        print(f'\r[{bar}]   {c}/{file_count}    ', end='')
+        if (i % step == 0) or (i == file_count - 1):
+            progress_bar(i, file_count, 100)
         
     with open(font_data_path, "w", encoding="utf-8") as f:
-        f.write(json.dumps(brightness_data))
+        json.dump(brightness_data, f, indent=2)
         
-    print(f"\nCalculated {c} characters' brightness for the {settings["font_name"]} font! ({round(time.time() - start_time, 2)}s)\n")
-    return True
-
-
-
-def tester():
-    chars = [] # array of 3 element arrys [ordinal, hex, brightness]
-    with open ("character_brightness.txt", "r", encoding="utf-8") as f:
-        lines = f.readlines()
-        for line in lines:
-            chars += [line.strip().split("-")]
-    chars.sort(key=lambda x: float(x[2]), reverse=True)
-    print(chars)
-    data = ""
-    data2 = ""
-    with open("character_brightness_sorted.txt", "w", encoding="utf-8") as f:
-        for i in range(0, len(chars)):
-            data += str(chars[i][0]) + "-" + str(chars[i][1]) + "-" + str(chars[i][2]) + "\n"
-            data2 += chr(int(chars[i][0]))
-        f.write(data)
-        with open("character_brightness_sorted_chars.txt", "w", encoding="utf-8") as f2:
-            f2.write(data2)
-            
-    print("Sorted character brightness data written to character_brightness_sorted.txt")
-
-    
-
-def process_font() -> bool:
-    # process the given font, render character images,
-    # calculate brightness, and save results
-    if (not generate_character_images()):
-        ValueError("Failed to generate character images.")
-    if (not generate_character_images_v2()):
-        ValueError("Failed to generate character images v2.")
-    if (not process_character_images()):
-        ValueError("Failed to process character images.")
-    return True
+    print(f"\nCalculated {file_count} characters' brightness for the {settings["font_name"]} font! ({perf_counter()-start:.2f}s)\n")
 
 
 def check_processed_font(font_name) -> bool:
     # checks if a font has been processed into brightness data
-    path = os.path.join(settings["script_path"], "font_data", f"{font_name}.json")
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            if len(lines) > 0:
-                return True
-    return False
+    path = sdir("font_data", f"{font_name}.json")
+    return os.path.isfile(path) and os.path.getsize(path) > 0
 
      
 def get_video_properties(file_path: str) -> dict:
@@ -255,11 +125,10 @@ def get_video_properties(file_path: str) -> dict:
 
 def clear_temp():
     # create/clear the temp folder
-    temp_path = os.path.join(settings["script_path"], "temp")
-    if not os.path.exists(temp_path):
-        os.makedirs(temp_path)
+    temp_path = sdir("temp")
+    vdir(temp_path)
     for f in os.listdir(temp_path):
-        file_path = os.path.join(temp_path, f)
+        file_path = sdir("temp", f)
         try:
             if os.path.isfile(file_path) and file_path.endswith('.png'):
                 os.remove(file_path)
@@ -267,30 +136,21 @@ def clear_temp():
             print(f'Failed to delete {file_path}. Reason: {e}')
 
 
-def verify_font(font_path: str) -> bool:
-    # check if the font file is valid
-    if os.path.exists(font_path) and font_path.endswith((".ttf", ".otf")):
-        try:
-            TTFont(font_path)
-            return True
-        except Exception as e:
-            return False
-    return False
-
-
 def verify_video(file_path: str) -> bool: 
-    # check if the file is a valid video file using OpenCV
-    if file_path.endswith((".mp4", ".mov", ".webm", ".mkv", ".wmv", ".avi," ".flv", ".mpeg", ".movie", ".m4v")):
-        capture = cv2.VideoCapture(file_path)
-        opened = capture.isOpened()
-        capture.release()
-        return opened
-    return False
+    """ Check if a video file is valid. """
+    cap = cv2.VideoCapture(file_path)
+    opened = cap.isOpened()
+    cap.release()
+    return opened
 
 
+@atexit.register
 def exit_handler():
     # clear temp on exit
-    clear_temp()
+    try:
+        clear_temp()
+    except Exception:
+        pass
     
 
 class FontChooser(simpledialog.Dialog):
@@ -317,9 +177,8 @@ class FontChooser(simpledialog.Dialog):
             except Exception:
                 continue
             
-        self.winfo_toplevel().geometry("400x200")  # starting size
-        self.winfo_toplevel().resizable(False, False)  # disable resizing
-
+        self.geometry("400x200") # window size
+        self.resizable(False, False) # disable resizing
         
         # font list
         self.combo = ttk.Combobox(master, values=sorted(self.fonts.keys()), state="readonly")
@@ -410,7 +269,7 @@ def main():
     root.withdraw()
     
     
-    # get video path
+    # # get video path
     # if len(sys.argv) == 2:
     #     settings["input_video_path"] = sys.argv[1]
     # elif len(sys.argv) > 2:
@@ -444,169 +303,24 @@ def main():
         
     settings["font_name"], settings["font_path"] = FontChooser(root, title="Choose a monospaced font").result
     print(f"Font selected: {settings["font_name"]}")
-    # print(f"Font name: {settings["font_name"]}")
-    # print(f"Font path: {settings["font_path"]}")
 
     # check if font has been processed
-    if not check_processed_font(settings["font_path"]):
+    if not check_processed_font(settings["font_name"]):
         print("Font has not been processed yet, processing now!")
-        process_font()
+        # process the given font, render character images,
+        # calculate brightness, and save results
+        generate_character_images()
+        process_character_images()
         print("Font processed!")
     
-    # output video settings
+    # TODO set output video settings and then render video
 
-        
-    
-    
     
 
 
 if __name__ == "__main__":
-    atexit.register(exit_handler)
-    try:
-        main()
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    main()
     for i in range(5, 0, -1):
         print(f"Exiting in {i} seconds...", end="\r")
-        time.sleep(1)
+        sleep(1)
     sys.exit(0)
-   
-    
-# generate_character_images()
-# process_character_images()
-# tester()
-# font = TTFont('./jetbrainsmono-regular.ttf')
-# for table in font['cmap'].tables:
-#     print(f"Platform: {table.platformID}, Encoding: {table.platEncID}, Entries: {len(table.cmap)}")
-
-
-
-# bbmaxX = 0
-# bbmaxY = 0
-# bbminX = 0
-# bbminY = 0
-# maxXchar = ""
-# maxYchar = ""
-# minXchar = ""
-# minYchar = ""
-# xcountmax = 0
-# ycountmax = 0
-# xcountmin = 0
-# ycountmin = 0
-
-# for i in range(0x110000):
-#     ch = chr(i)
-#     if ch.isprintable():
-#         bb = font.getbbox(ch)
-#         if bb[0] < font.getbbox(full_block_char)[0]:
-#             xcountmin += 1
-#         if bb[1] < font.getbbox(full_block_char)[1]:
-#             ycountmin += 1
-#         if bb[2] > font.getbbox(full_block_char)[2]:
-#             xcountmax += 1
-#         if bb[3] > font.getbbox(full_block_char)[3]:
-#             ycountmax += 1
-            
-#         if bb[0] < bbminX:
-#             bbminX = bb[0]
-#             minXchar = ch
-#         if bb[1] < bbminY:
-#             bbminY = bb[1]
-#             minYchar = ch
-#         if bb[2] > bbmaxX:
-#             bbmaxX = bb[2]
-#             maxXchar = ch
-#         if bb[3] > bbmaxY:
-#             bbmaxY = bb[3]
-#             maxYchar = ch
-    
-# print("maxX: " + str(bbmaxX) + " for char: " + maxXchar + " " + str(ord(maxXchar)) + " count: " + str(xcountmax))
-# print("maxY: " + str(bbmaxY) + " for char: " + maxYchar + " " + str(ord(maxYchar)) + " count: " + str(ycountmax))
-# print("minX: " + str(bbminX) + " for char: " + minXchar + " " + str(ord(minXchar)) + " count: " + str(xcountmin))
-# print("minY: " + str(bbminY) + " for char: " + minYchar + " " + str(ord(minYchar)) + " count: " + str(ycountmin))
-
-
-
-
-# c = 0
-# with open("unicode_sample.txt", "w", encoding="utf-8") as f:
-#     for i in range(0x110000):
-#         ch = chr(i)
-#         if ch.isprintable():
-#             c += 1
-#             f.write(ch)
-#             if c > 150:
-#                 f.write("\n")
-#                 c = 0
-
-
-
-# def get_installed_fonts():
-#     # gets the pc's installed fonts from the registry
-#     # copies fonts to local folder for use
-#     fonts = {}
-#     key_paths = [
-#         (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"),
-#         (winreg.HKEY_CURRENT_USER,   r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
-#     ]
-#     for key_path in key_paths: 
-#         with winreg.OpenKey(key_path[0], key_path[1]) as key:
-#             for i in range(winreg.QueryInfoKey(key)[1]):
-#                 name, path, _ = winreg.EnumValue(key, i)
-#                 if path.lower().endswith(('.ttf','.otf','.ttc')):
-#                     fonts[name] = os.path.join(r"C:\Windows\Fonts", path)
-#                 # if path.lower().endswith((".ttf", ".ttc", ".otf")) and "TrueType" in name:
-#                 #     fonts[name.replace(" (TrueType)", "")] = os.path.join(r"C:\Windows\Fonts", path)
-
-#     # filter for monospace fonts
-#     fonts = {fam: filepath for fam, filepath in fonts.items() if tkfont.Font(family=fam).metrics("fixed")}
-#     return fonts
-    
-    # copy fonts to folder
-    # fonts_path = os.path.join(settings["script_path"], "fonts", "raw")
-    # if not os.path.exists(fonts_path):
-    #     os.makedirs(fonts_path)
-    # for name, path in fonts.items():
-    #     if not os.path.exists(fonts_path + "/" + name + path[-4:]):
-    #         try:
-    #             with open(path, "rb") as f:
-    #                 with open(fonts_path + "/" + name + path[-4:], "wb") as f2:
-    #                     f2.write(f.read())
-    #         except Exception as e:
-    #             print(f"Failed to copy font {name} from path {path} to {fonts_path + "/" + name + path[-4:]}: {e}")
-                
-    # fonts list with local paths
-    # fonts_local = {}
-    # for name, path in fonts.items():
-    #     fonts_local[name] = name + path[-4:]
-    # return fonts_local
-    
-    
-        # get_installed_fonts()
-    
-    # print("Please select a font:")
-    # # NOTE: i have to do this fucking stdout devnull shit bc windows left a stray printf in comdlg32.dll
-    # fd = os.dup(1)
-    # with open(os.devnull, 'w') as dn:
-    #     os.dup2(dn.fileno(), 1) # redirect stdout to null
-    #     settings["font_path"] = filedialog.askopenfilename(
-    #         filetypes=[("TrueType/OpenType Fonts", "*.ttf;*.ttc;*.otf")],
-    #         title="Select a font",
-    #         initialdir=os.path.join(settings["script_path"], "fonts", "raw"),
-    #     )
-    # os.dup2(fd, 1) 
-    # os.close(fd)
-
-    # while verify_font(settings["font_path"]) == False:
-    #     print("Invalid font, please select a valid font:")
-    #     fd = os.dup(1) 
-    #     with open(os.devnull, 'w') as dn:
-    #         os.dup2(dn.fileno(), 1) # redirect stdout to null
-    #         settings["font_path"] = filedialog.askopenfilename(
-    #             filetypes=[("TrueType/OpenType Fonts", "*.ttf;*.ttc;*.otf")],
-    #             title="Select a font",
-    #             initialdir=os.path.join(settings["script_path"], "fonts", "raw"),
-    #         )
-    #     os.dup2(fd, 1) 
-    #     os.close(fd)

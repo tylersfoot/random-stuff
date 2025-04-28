@@ -1,5 +1,6 @@
-pillow
-opencv-python
-fonttools
-tkfontchooser
-matplotlib
+pillow==11.2.1
+opencv-python==4.11.0.86
+fonttools==4.57.0
+matplotlib==3.10.1
+inquirer==3.4.0
+moviepy==2.1.2

@@ -1,22 +1,62 @@
 #!.\.venv\Scripts\python.exe
 
 # stdlib
-import os, sys, ctypes, json, atexit
+import os, sys, ctypes, json, atexit, subprocess
 from time import perf_counter, sleep
-
-# tkinter
-import tkinter as tk
-from tkinter import ttk, simpledialog, filedialog, font as tkfont
-
+import numpy as np
+from bisect import bisect_left
+from contextlib import contextmanager
 # imaging
 from PIL import Image, ImageDraw, ImageFont, ImageStat
 from fontTools.ttLib import TTFont
-
 # video
 import cv2
 from matplotlib import font_manager
+from moviepy import VideoFileClip, AudioFileClip
+# misc
+import tkinter as tk
+from tkinter import ttk, simpledialog, filedialog, font as tkfont
+import inquirer
+from dataclasses import dataclass
+from tqdm import tqdm
 
-        
+
+@dataclass
+class Config:
+    input_video_path: str
+    font_name:          str
+    font_path:          str
+    font_size:          int
+    output_video_path:  str
+    output_video_fps:   int
+    progress_bar_size:  int
+    script_path:        str
+    
+
+CHAR_SETS = {
+    "ASCII":              [chr(i) for i in range(0x20, 0x7F)],
+    "Extended ASCII":     [chr(i) for i in range(0x20, 0x100)],
+    "Lowercase Alphabet": list("abcdefghijklmnopqrstuvwxyz"),
+    "Uppercase Alphabet": list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"),
+    "Digits":             list("0123456789"),
+    "Symbols":            list("[#$%&()*+,-./0123456789<=>?@[\\]^_`{|}~]"),
+    "Hex":                list("0123456789ABCDEF"),
+    "Ramp":               list(" .:-=+*#%@"),
+}
+
+@contextmanager
+def suppress_stdout_stderr():
+    with open(os.devnull, 'w') as devnull:
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = devnull
+        sys.stderr = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
         
 def sdir(*sub: any) -> str:
     """Make a subdirectory from the script path."""
@@ -32,7 +72,130 @@ def progress_bar(i, total, size):
     pct = (i + 1) * 100 // total
     bar = "=" * pct + " " * (size - pct)
     print(f"\r[{bar}]  {i+1}/{total}  {pct}% ", end="")
+    
+
+def render_video(allowed_cp, allow_all):
+    """Render the video using the given character sets, then re-attach audio."""
+    start = perf_counter()
+    
+    out_path        = settings["output_video_path"]
+    vdir(os.path.dirname(out_path))
+    silent_path     = sdir("temp", "silent.mp4")
+    font_size       = settings["font_size"]
+    brightness_path = sdir("font_data", f"{settings["font_name"]}.json")
+    font            = ImageFont.truetype(settings["font_path"], font_size)
+    cell_w, cell_h  = font.getbbox("█")[2:]
+    
+    # load character brightness data
+    with open(brightness_path, "r", encoding="utf-8") as f:
+        bright_map = json.load(f)
+
+    # sort by brightness, filter by allowed characters
+    chars = sorted(
+        ( (int(k,16), float(v)) for k,v in bright_map.items()
+          if allow_all or int(k,16) in allowed_cp ),
+        key=lambda kv: kv[1]
+    )
+    brights = [b for _, b in chars] # brightness values
+    lut = [             # lookup table for index 0..255 -> codepoint
+        chars[min(bisect_left(brights, i/255), len(chars)-1)][0]
+        for i in range(256)
+    ]
+    
+    glyphs: dict[int, np.ndarray] = {}
+    for cp,_ in chars:
+        ch = chr(cp)
+        img = Image.new("RGB", (cell_w, cell_h), "black")
+        ImageDraw.Draw(img).text((0,0), ch, font=font, fill="white")
+        glyphs[cp] = np.array(img)
+    
+    # build an array of all glyphs stacked:
+    #   glyph_arr.shape == (N, cell_h, cell_w, 3)
+    #   and build a map cp2idx: codepoint -> index in glyph_arr
+    glyph_list = [glyphs[cp] for cp,_ in chars]
+    glyph_arr = np.stack(glyph_list, axis=0) # stack glyphs into a single array
+    cp2idx = {cp: i for i, (cp,_) in enumerate(chars)} # codepoint to index mapping
+    lut_idx = np.array([cp2idx[lut[i]] for i in range(256)], dtype=np.int32)
+    
+    # open source video and prepare writer for silent video
+    cap       = cv2.VideoCapture(settings["input_video_path"])
+    src_w     = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    src_h     = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    src_fps   = cap.get(cv2.CAP_PROP_FPS)
+    out_fps   = settings["output_video_fps"] or src_fps
+    out_fps   = max(1, min(int(src_fps), int(out_fps)))
+    ratio     = src_fps / out_fps
+    total_in  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    total_out = int(total_in / ratio)
+    
+    cols = src_w // cell_w
+    rows = src_h // cell_h
+    
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    writer = cv2.VideoWriter(silent_path, fourcc, out_fps, (cols * cell_w, rows * cell_h))
+
+    accum, rendered = 0.0, 0
+    print(f"Rendering ASCII video: {src_w}x{src_h} ({cols}x{rows}@{out_fps}FPS)")
+    # for frame in tqdm(reader, total=total_out, desc="Frames"):
+    while True:
+        # loop through the video frames
+        ret, frame = cap.read()
+        if not ret: # no more frames
+            break
+        accum += 1.0
         
+        # only process when we've “collected” enough source frames
+        if accum < ratio:
+            continue
+        accum -= ratio
+        
+        # grayscale and resize frame into cell size
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        small = cv2.resize(gray, (cols, rows), interpolation=cv2.INTER_AREA)
+        
+        # map every small[r,c] directly to an index into glyph_arr
+        idxs   = lut_idx[small] # shape (rows,cols)
+        blocks = glyph_arr[idxs] # shape (rows,cols,cell_h,cell_w,3)
+        blocks = blocks.transpose(0,2,1,3,4) # (rows,cell_h,cols,cell_w,3)
+        canvas = blocks.reshape(rows*cell_h, cols*cell_w, 3)
+        
+        
+        # output canvas
+        # canvas = np.zeros((rows * cell_h, cols * cell_w, 3), dtype=np.uint8)
+        
+        
+        # for r in range(rows):
+        #     for c in range(cols):
+        #         cp = lut[small[r, c]] # get codepoint from brightness lookup table
+        #         canvas[
+        #             r*cell_h:(r+1)*cell_h,
+        #             c*cell_w:(c+1)*cell_w
+        #         ] = glyphs[cp]  # draw glyph
+                
+        writer.write(canvas)
+        rendered += 1
+        progress_bar(rendered, total_out, settings["progress_bar_size"])
+        
+    cap.release()
+    writer.release()
+    
+    # re-attach audio via moviepy
+    print(f"\n\nRe-attaching audio...")
+    with suppress_stdout_stderr():
+        with VideoFileClip(silent_path) as silent, AudioFileClip(settings["input_video_path"]) as audio:
+            final = silent.with_audio(audio)
+            final.write_videofile(
+                out_path, 
+                codec="libx264", 
+                audio_codec="aac", 
+                fps=out_fps,
+                ffmpeg_params=["-c:v", "copy"],
+                threads=4,
+                logger=None)
+    
+    print(f"Done! Rendered {rendered}/{total_out} frames in {perf_counter()-start:.2f}s")
+    print(f"Video saved to {out_path}\n")
+
     
 def generate_character_images():
     """Generate character images from the given font."""
@@ -42,6 +205,7 @@ def generate_character_images():
     font = ImageFont.truetype(settings["font_path"], font_size)
 
     w, h = (font.getbbox("█")[2], font.getbbox("█")[3])
+    print(f"Image size: {w}x{h}")
 
     cmap = {}
     for table in TTFont(settings["font_path"])["cmap"].tables:
@@ -57,16 +221,16 @@ def generate_character_images():
         x0, y0, x1, y1 = font.getbbox(c)
         
         # if the character fits in the image
-        if (0 <= x0 < x1 <= w) and (0 <= y0 < y1 <= h):
+        if (x0 >= 0) and (y0 >= 0) and (x1 <= w) and (y1 <= h):
             img = Image.new("RGB", (w, h), "black")
             ImageDraw.Draw(img).text((0, 0), c, font=font, fill="white")
             img.save(sdir("temp", f"0x{cp:06X}.png"))
             gen += 1
         
         if (i % step == 0) or (i == total - 1):
-            progress_bar(i, total, 100)
+            progress_bar(i, total, settings["progress_bar_size"])
     
-    print(f"\nSucessfully generated {gen}/{total} characters! ({perf_counter()-start:.2f}s)\n")
+    print(f"\nSucessfully generated {gen}/{total} characters! ({perf_counter() - start:.2f}s)\n")
     
     
 def process_character_images():
@@ -77,7 +241,6 @@ def process_character_images():
             return stat.mean[0] / 255.0 
         
     start = perf_counter()
-    image_folder_path = sdir("temp")
     vdir(sdir("font_data"))
     font_data_path = sdir("font_data", f"{settings["font_name"]}.json")
     brightness_data = {}
@@ -92,39 +255,22 @@ def process_character_images():
         brightness_data[file[:-4]] = f"{b:.4f}"
         
         if (i % step == 0) or (i == file_count - 1):
-            progress_bar(i, file_count, 100)
+            progress_bar(i, file_count, settings["progress_bar_size"])
         
     with open(font_data_path, "w", encoding="utf-8") as f:
         json.dump(brightness_data, f, indent=2)
         
-    print(f"\nCalculated {file_count} characters' brightness for the {settings["font_name"]} font! ({perf_counter()-start:.2f}s)\n")
+    print(f"\nCalculated {file_count} characters' brightness for the {settings["font_name"]} font! ({perf_counter() - start:.2f}s)\n")
 
 
 def check_processed_font(font_name) -> bool:
-    # checks if a font has been processed into brightness data
+    """Check if a font has been processed into brightness data."""
     path = sdir("font_data", f"{font_name}.json")
     return os.path.isfile(path) and os.path.getsize(path) > 0
 
-     
-def get_video_properties(file_path: str) -> dict:
-    # get video properties using OpenCV
-    capture = cv2.VideoCapture(file_path)
-    if not capture.isOpened():
-        return None
-    
-    properties = {
-        "width": int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
-        "height": int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        "fps": int(capture.get(cv2.CAP_PROP_FPS)),
-        "frames": int(capture.get(cv2.CAP_PROP_FRAME_COUNT)),
-    }
-    
-    capture.release()
-    return properties
-
 
 def clear_temp():
-    # create/clear the temp folder
+    """Create/clear the temporary folder."""
     temp_path = sdir("temp")
     vdir(temp_path)
     for f in os.listdir(temp_path):
@@ -137,7 +283,7 @@ def clear_temp():
 
 
 def verify_video(file_path: str) -> bool: 
-    """ Check if a video file is valid. """
+    """Check if a file is a valid video."""
     cap = cv2.VideoCapture(file_path)
     opened = cap.isOpened()
     cap.release()
@@ -243,25 +389,28 @@ class FontChooser(simpledialog.Dialog):
 def main():
     global settings
     settings = {
-        # input video properties
         "input_video_path": "",
-        "input_video_size": [0, 0], # w, h in px
-        "input_video_fps": 0,
-        "input_video_frames": 0,
-        # font properties
         "font_name": "", # font family name
-        "font_path": "./jetbrainsmono-regular.ttf", # path to ttf/otf font
-        "font_size": 200, # for rendering
-        # terminal/console settings
-        "terminal_width": 100,
-        "terminal_height": 30,
-        # export/output video settings
+        "font_path": "", # path to ttf/otf font
+        "font_size": 10, # for rendering
+        # "terminal_width": 100,
+        # "terminal_height": 30,
         "output_video_path": "", # where rendered video will be saved
-        "output_video_size": [0, 0], # w, h in px
         "output_video_fps": 0,
-        # path to this python file
+        "progress_bar_size": 100,
         "script_path": os.path.dirname(os.path.abspath(__file__)),
     }
+    
+    # config = Config(
+    #     input_video_path = "",
+    #     font_name = "",
+    #     font_path = "",
+    #     font_size = 10,
+    #     output_video_path = "",
+    #     output_video_fps = 0,
+    #     progress_bar_size = 100,
+    #     script_path = os.path.dirname(os.path.abspath(__file__))
+    # )
     
     clear_temp()
 
@@ -269,37 +418,26 @@ def main():
     root.withdraw()
     
     
-    # # get video path
-    # if len(sys.argv) == 2:
-    #     settings["input_video_path"] = sys.argv[1]
-    # elif len(sys.argv) > 2:
-    #     print("Multiple files detected, only the first one will be used.")
-    #     settings["input_video_path"] = sys.argv[1]
-    # else:
-    #     print("Please select a video file:")
-    #     settings["input_video_path"] = filedialog.askopenfilename(
-    #         filetypes=[("Video files", "*.mp4;*.mov;*.webm;*.mkv;*.wmv;*.avi;*.flv;*.mpeg;*.movie;*.m4v")],
-    #         title="Select a video file",
-    #     )
+    # get video path
+    if len(sys.argv) == 2:
+        settings["input_video_path"] = sys.argv[1]
+    elif len(sys.argv) > 2:
+        print("Multiple files detected, only the first one will be used.")
+        settings["input_video_path"] = sys.argv[1]
+    else:
+        print("Please select a video file:")
+        settings["input_video_path"] = filedialog.askopenfilename(
+            filetypes=[("Video files", "*.mp4;*.mov;*.webm;*.mkv;*.wmv;*.avi;*.flv;*.mpeg;*.movie;*.m4v")],
+            title="Select a video file",
+        )
 
-    # while verify_video(settings["input_video_path"]) == False:
-    #     print("Invalid video file, please select a valid video file:")
-    #     settings["input_video_path"] = filedialog.askopenfilename(
-    #         filetypes=[("Video files", "*.mp4;*.mov;*.webm;*.mkv;*.wmv;*.avi;*.flv;*.mpeg;*.movie;*.m4v")],
-    #         title="Select a video file",
-    #     )
-    # print(f"Video path selected: {settings["input_video_path"]}")
-    # # get video properties
-    # video_properties = get_video_properties(settings["input_video_path"])
-    # if video_properties is not None:
-    #     settings["input_video_size"] = [video_properties["width"], video_properties["height"]]
-    #     settings["input_video_fps"] = video_properties["fps"]
-    #     settings["input_video_frames"] = video_properties["frames"]
-    # else:
-    #     ValueError("Could not extract video properties.")
-    #     return
-    # print(f"Video properties: {settings['input_video_size'][0]}x{settings['input_video_size'][1]} @ {settings['input_video_fps']} fps, {settings['input_video_frames']} frames")
-    
+    while verify_video(settings["input_video_path"]) == False:
+        print("Invalid video file, please select a valid video file:")
+        settings["input_video_path"] = filedialog.askopenfilename(
+            filetypes=[("Video files", "*.mp4;*.mov;*.webm;*.mkv;*.wmv;*.avi;*.flv;*.mpeg;*.movie;*.m4v")],
+            title="Select a video file",
+        )
+    print(f"Video path selected: {settings["input_video_path"]}")
         
     settings["font_name"], settings["font_path"] = FontChooser(root, title="Choose a monospaced font").result
     print(f"Font selected: {settings["font_name"]}")
@@ -313,11 +451,38 @@ def main():
         process_character_images()
         print("Font processed!")
     
-    # TODO set output video settings and then render video
+    root.destroy()
+    # output name based on input video name
+    settings["output_video_path"] = sdir("output", f"{os.path.splitext(os.path.basename(settings["input_video_path"]))[0]}.mp4") 
+    
+    questions = [
+        inquirer.Text(
+            'fps',
+            message="Please enter the output video FPS (leave blank to match input)",
+            validate=lambda _, x: x.isdigit() or x == "",
+            default=settings["output_video_fps"],
+        ),
+        inquirer.Checkbox(
+            "character_set",
+            message="Please choose a character set (or multiple to combine)",
+            choices=["ASCII", "Extended ASCII", "Lowercase Alphabet", "Uppercase Alphabet",
+                     "Digits", "Symbols", "Hex", "Ramp", "All"],
+        ),
+    ]
+
+    answers = inquirer.prompt(questions)
+    settings["output_video_fps"] = int(answers["fps"]) if answers["fps"] else 0
+    allow_all = "All" in answers["character_set"] or not answers["character_set"]
+    allowed_cp = {
+        ord(c)
+        for cs in answers["character_set"]
+        for c in CHAR_SETS.get(cs, [])
+    } if not allow_all else None
+    
+    render_video(allowed_cp, allow_all)
+    subprocess.run(["explorer", "/select,", settings["output_video_path"]])
 
     
-
-
 if __name__ == "__main__":
     main()
     for i in range(5, 0, -1):

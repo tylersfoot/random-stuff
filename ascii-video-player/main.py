@@ -136,7 +136,7 @@ def render_video(allowed_cp, allow_all):
 
     accum, rendered = 0.0, 0
     print(f"Rendering ASCII video: {src_w}x{src_h} ({cols}x{rows}@{out_fps}FPS)")
-    # for frame in tqdm(reader, total=total_out, desc="Frames"):
+    pbar = tqdm(total=total_out, desc="Rendering", unit="frames")
     while True:
         # loop through the video frames
         ret, frame = cap.read()
@@ -158,40 +158,14 @@ def render_video(allowed_cp, allow_all):
         blocks = glyph_arr[idxs] # shape (rows,cols,cell_h,cell_w,3)
         blocks = blocks.transpose(0,2,1,3,4) # (rows,cell_h,cols,cell_w,3)
         canvas = blocks.reshape(rows*cell_h, cols*cell_w, 3)
-        
-        
-        # output canvas
-        # canvas = np.zeros((rows * cell_h, cols * cell_w, 3), dtype=np.uint8)
-        
-        
-        # for r in range(rows):
-        #     for c in range(cols):
-        #         cp = lut[small[r, c]] # get codepoint from brightness lookup table
-        #         canvas[
-        #             r*cell_h:(r+1)*cell_h,
-        #             c*cell_w:(c+1)*cell_w
-        #         ] = glyphs[cp]  # draw glyph
                 
         writer.write(canvas)
         rendered += 1
-        progress_bar(rendered, total_out, settings["progress_bar_size"])
+        pbar.update(1)
         
     cap.release()
     writer.release()
-    
-    # re-attach audio via moviepy
-    print(f"\n\nRe-attaching audio...")
-    with suppress_stdout_stderr():
-        with VideoFileClip(silent_path) as silent, AudioFileClip(settings["input_video_path"]) as audio:
-            final = silent.with_audio(audio)
-            final.write_videofile(
-                out_path, 
-                codec="libx264", 
-                audio_codec="aac", 
-                fps=out_fps,
-                ffmpeg_params=["-c:v", "copy"],
-                threads=4,
-                logger=None)
+    pbar.close()
     
     print(f"Done! Rendered {rendered}/{total_out} frames in {perf_counter()-start:.2f}s")
     print(f"Video saved to {out_path}\n")
@@ -213,10 +187,9 @@ def generate_character_images():
     codepoints = sorted(cmap.keys())
 
     total = len(codepoints)
-    step = max(1, total//400)
     gen = 0
     print(f"\nGenerating characters...")
-    for i, cp in enumerate(codepoints): # cp = unicode codepoint (int)
+    for cp in tqdm(codepoints, desc="Characters", total=total, unit="chars"):
         c = chr(cp) # char
         x0, y0, x1, y1 = font.getbbox(c)
         
@@ -226,9 +199,6 @@ def generate_character_images():
             ImageDraw.Draw(img).text((0, 0), c, font=font, fill="white")
             img.save(sdir("temp", f"0x{cp:06X}.png"))
             gen += 1
-        
-        if (i % step == 0) or (i == total - 1):
-            progress_bar(i, total, settings["progress_bar_size"])
     
     print(f"\nSucessfully generated {gen}/{total} characters! ({perf_counter() - start:.2f}s)\n")
     
@@ -248,14 +218,10 @@ def process_character_images():
     files = [f for f in os.listdir(sdir("temp")) if (os.path.isfile(sdir("temp", f)) and f.lower().endswith('.png'))]
     
     file_count = len(files)
-    step = max(1, file_count//400)
     print(f"Calculating font brightness...")
-    for i, file in enumerate(files):
+    for file in tqdm(files, desc="Brightness", total=file_count, unit="img"):
         b = mean_brightness(sdir("temp", file))
         brightness_data[file[:-4]] = f"{b:.4f}"
-        
-        if (i % step == 0) or (i == file_count - 1):
-            progress_bar(i, file_count, settings["progress_bar_size"])
         
     with open(font_data_path, "w", encoding="utf-8") as f:
         json.dump(brightness_data, f, indent=2)

@@ -1,7 +1,7 @@
 #!.\.venv\Scripts\python.exe
 
 # stdlib
-import os, sys, ctypes, json, atexit, subprocess
+import os, sys, ctypes, json, atexit, subprocess, argparse
 from time import perf_counter, sleep
 import numpy as np
 from bisect import bisect_left
@@ -17,21 +17,22 @@ from moviepy import VideoFileClip, AudioFileClip
 import tkinter as tk
 from tkinter import ttk, simpledialog, filedialog, font as tkfont
 import inquirer
+import questionary
+from InquirerPy import inquirer as inquirerPy
+from InquirerPy.validator import PathValidator
 from dataclasses import dataclass
 from tqdm import tqdm
 
 
 @dataclass
 class Config:
-    input_video_path: str
-    font_name:          str
-    font_path:          str
-    font_size:          int
-    output_video_path:  str
-    output_video_fps:   int
-    progress_bar_size:  int
-    script_path:        str
-    
+    input_video_path:   str = ""
+    font_name:          str = ""
+    font_path:          str = ""
+    font_size:          int = 10
+    output_video_path:  str = ""
+    output_video_fps:   int = 0
+    script_path:        str = ""
 
 CHAR_SETS = {
     "ASCII":              [chr(i) for i in range(0x20, 0x7F)],
@@ -60,30 +61,24 @@ def suppress_stdout_stderr():
         
 def sdir(*sub: any) -> str:
     """Make a subdirectory from the script path."""
-    return os.path.join(settings["script_path"], *sub)
+    return os.path.join(config.script_path, *sub)
+
 
 def vdir(path):
     """Ensure the directory exists."""
     os.makedirs(path, exist_ok=True)
-    
-    
-def progress_bar(i, total, size):
-    """Display a progress bar."""
-    pct = (i + 1) * 100 // total
-    bar = "=" * pct + " " * (size - pct)
-    print(f"\r[{bar}]  {i+1}/{total}  {pct}% ", end="")
-    
+
 
 def render_video(allowed_cp, allow_all):
     """Render the video using the given character sets, then re-attach audio."""
     start = perf_counter()
     
-    out_path        = settings["output_video_path"]
+    out_path        = config.output_video_path
     vdir(os.path.dirname(out_path))
     silent_path     = sdir("temp", "silent.mp4")
-    font_size       = settings["font_size"]
-    brightness_path = sdir("font_data", f"{settings["font_name"]}.json")
-    font            = ImageFont.truetype(settings["font_path"], font_size)
+    font_size       = config.font_size
+    brightness_path = sdir("font_data", f"{config.font_name}.json")
+    font            = ImageFont.truetype(config.font_path, font_size)
     cell_w, cell_h  = font.getbbox("█")[2:]
     
     # load character brightness data
@@ -118,12 +113,12 @@ def render_video(allowed_cp, allow_all):
     lut_idx = np.array([cp2idx[lut[i]] for i in range(256)], dtype=np.int32)
     
     # open source video and prepare writer for silent video
-    cap       = cv2.VideoCapture(settings["input_video_path"])
+    cap       = cv2.VideoCapture(config.input_video_path)
     src_w     = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     src_h     = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    src_fps   = cap.get(cv2.CAP_PROP_FPS)
-    out_fps   = settings["output_video_fps"] or src_fps
-    out_fps   = max(1, min(int(src_fps), int(out_fps)))
+    src_fps   = int(cap.get(cv2.CAP_PROP_FPS))
+    out_fps   = config.output_video_fps or src_fps
+    out_fps   = max(1, min(src_fps, out_fps))
     ratio     = src_fps / out_fps
     total_in  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     total_out = int(total_in / ratio)
@@ -176,13 +171,13 @@ def generate_character_images():
     start = perf_counter()
     
     font_size = 200 # resolution/size of the images
-    font = ImageFont.truetype(settings["font_path"], font_size)
+    font = ImageFont.truetype(config.font_path, font_size)
 
     w, h = (font.getbbox("█")[2], font.getbbox("█")[3])
     print(f"Image size: {w}x{h}")
 
     cmap = {}
-    for table in TTFont(settings["font_path"])["cmap"].tables:
+    for table in TTFont(config.font_path)["cmap"].tables:
         cmap.update(table.cmap)
     codepoints = sorted(cmap.keys())
 
@@ -212,7 +207,7 @@ def process_character_images():
         
     start = perf_counter()
     vdir(sdir("font_data"))
-    font_data_path = sdir("font_data", f"{settings["font_name"]}.json")
+    font_data_path = sdir("font_data", f"{config.font_name}.json")
     brightness_data = {}
     
     files = [f for f in os.listdir(sdir("temp")) if (os.path.isfile(sdir("temp", f)) and f.lower().endswith('.png'))]
@@ -226,7 +221,7 @@ def process_character_images():
     with open(font_data_path, "w", encoding="utf-8") as f:
         json.dump(brightness_data, f, indent=2)
         
-    print(f"\nCalculated {file_count} characters' brightness for the {settings["font_name"]} font! ({perf_counter() - start:.2f}s)\n")
+    print(f"\nCalculated {file_count} characters' brightness for the {config.font_name} font! ({perf_counter() - start:.2f}s)\n")
 
 
 def check_processed_font(font_name) -> bool:
@@ -248,12 +243,31 @@ def clear_temp():
             print(f'Failed to delete {file_path}. Reason: {e}')
 
 
-def verify_video(file_path: str) -> bool: 
-    """Check if a file is a valid video."""
-    cap = cv2.VideoCapture(file_path)
-    opened = cap.isOpened()
-    cap.release()
-    return opened
+def validate_font(file_path: str) -> bool: 
+    """Check if a file is a valid TrueType/OpenType font."""
+    if not os.path.isfile(file_path):
+        return False
+    try:
+        font = ImageFont.truetype(file_path, 10)
+        return True
+    except Exception:
+        return False
+
+def validate_video(file_path: str) -> bool:
+    """Check if a given file path points to a valid video file."""
+    if not os.path.isfile(file_path):
+        return False
+    try:
+        cap = cv2.VideoCapture(file_path)
+        if not cap.isOpened():
+            cap.release()
+            return False
+        # try reading the first frame
+        ret, _ = cap.read()
+        cap.release()
+        return ret
+    except Exception:
+        return False
 
 
 @atexit.register
@@ -351,65 +365,40 @@ class FontChooser(simpledialog.Dialog):
         # record it into loaded_fonts
         self.fonts[family] = path
     
-
-def main():
-    global settings
-    settings = {
-        "input_video_path": "",
-        "font_name": "", # font family name
-        "font_path": "", # path to ttf/otf font
-        "font_size": 10, # for rendering
-        # "terminal_width": 100,
-        # "terminal_height": 30,
-        "output_video_path": "", # where rendered video will be saved
-        "output_video_fps": 0,
-        "progress_bar_size": 100,
-        "script_path": os.path.dirname(os.path.abspath(__file__)),
-    }
+def main_gui():
+    """Main function for the graphical user interface, using tkinter."""
+    print("Damn, this is a GUI!")
     
-    # config = Config(
-    #     input_video_path = "",
-    #     font_name = "",
-    #     font_path = "",
-    #     font_size = 10,
-    #     output_video_path = "",
-    #     output_video_fps = 0,
-    #     progress_bar_size = 100,
-    #     script_path = os.path.dirname(os.path.abspath(__file__))
-    # )
-    
-    clear_temp()
-
     root = tk.Tk()
     root.withdraw()
     
     
     # get video path
     if len(sys.argv) == 2:
-        settings["input_video_path"] = sys.argv[1]
+        config.input_video_path = sys.argv[1]
     elif len(sys.argv) > 2:
         print("Multiple files detected, only the first one will be used.")
-        settings["input_video_path"] = sys.argv[1]
+        config.input_video_path = sys.argv[1]
     else:
         print("Please select a video file:")
-        settings["input_video_path"] = filedialog.askopenfilename(
+        config.input_video_path = filedialog.askopenfilename(
             filetypes=[("Video files", "*.mp4;*.mov;*.webm;*.mkv;*.wmv;*.avi;*.flv;*.mpeg;*.movie;*.m4v")],
             title="Select a video file",
         )
 
-    while verify_video(settings["input_video_path"]) == False:
+    while validate_video(config.input_video_path) == False:
         print("Invalid video file, please select a valid video file:")
-        settings["input_video_path"] = filedialog.askopenfilename(
+        config.input_video_path = filedialog.askopenfilename(
             filetypes=[("Video files", "*.mp4;*.mov;*.webm;*.mkv;*.wmv;*.avi;*.flv;*.mpeg;*.movie;*.m4v")],
             title="Select a video file",
         )
-    print(f"Video path selected: {settings["input_video_path"]}")
+    print(f"Video path selected: {config.input_video_path}")
         
-    settings["font_name"], settings["font_path"] = FontChooser(root, title="Choose a monospaced font").result
-    print(f"Font selected: {settings["font_name"]}")
+    config.font_name, config.font_path = FontChooser(root, title="Choose a monospaced font").result
+    print(f"Font selected: {config.font_name}")
 
     # check if font has been processed
-    if not check_processed_font(settings["font_name"]):
+    if not check_processed_font(config.font_name):
         print("Font has not been processed yet, processing now!")
         # process the given font, render character images,
         # calculate brightness, and save results
@@ -419,14 +408,14 @@ def main():
     
     root.destroy()
     # output name based on input video name
-    settings["output_video_path"] = sdir("output", f"{os.path.splitext(os.path.basename(settings["input_video_path"]))[0]}.mp4") 
+    config.output_video_path = sdir("output", f"{os.path.splitext(os.path.basename(config.input_video_path))[0]}.mp4") 
     
     questions = [
         inquirer.Text(
             'fps',
             message="Please enter the output video FPS (leave blank to match input)",
             validate=lambda _, x: x.isdigit() or x == "",
-            default=settings["output_video_fps"],
+            default=config.output_video_fps,
         ),
         inquirer.Checkbox(
             "character_set",
@@ -437,7 +426,7 @@ def main():
     ]
 
     answers = inquirer.prompt(questions)
-    settings["output_video_fps"] = int(answers["fps"]) if answers["fps"] else 0
+    config.output_video_fps = int(answers["fps"]) if answers["fps"] else 0
     allow_all = "All" in answers["character_set"] or not answers["character_set"]
     allowed_cp = {
         ord(c)
@@ -446,11 +435,130 @@ def main():
     } if not allow_all else None
     
     render_video(allowed_cp, allow_all)
-    subprocess.run(["explorer", "/select,", settings["output_video_path"]])
+    subprocess.run(["explorer", "/select,", config.output_video_path])
+    return
+
+
+def main_cli():
+    """Main function for the command line interface, using inquirer to ask for inputs."""
+    
+    print("~~~inquirer~~~")
+    questions = [
+        inquirer.Path(
+            name='input_video_path',
+            message="Enter path to input video",
+            exists=True,
+            path_type=inquirer.Path.FILE,
+            validate=lambda _, x: validate_video(x)
+        ),
+        inquirer.Path(
+            name='font_path',
+            message="Enter path to ttf/otf font file",
+            exists=True,
+            path_type=inquirer.Path.FILE,
+            validate=lambda _, x: x.lower().endswith(('.ttf', '.otf')),
+        )
+    ]
+    answers = inquirer.prompt(questions)
+    print(os.path.abspath(answers['input_video_path']))
+    
+    print("~~~inquirerPy~~~")
+    src_path = inquirerPy.filepath(
+        message="Enter path to input video:",
+        validate=PathValidator(is_file=True, message="Input is not a file"),
+        only_files=True,
+    ).execute()
+    print(os.path.abspath(src_path))
+    
+    print("~~~questionary~~~")
+    path = questionary.path(
+        message="Enter path to input video:",
+        validate=validate_video
+    ).ask()
+    print(os.path.abspath(path))
+    
+
+        
+    # config.font_name, config.font_path = FontChooser(root, title="Choose a monospaced font").result
+    # print(f"Font selected: {config.font_name}")
+
+    # # check if font has been processed
+    # if not check_processed_font(config.font_name):
+    #     print("Font has not been processed yet, processing now!")
+    #     # process the given font, render character images,
+    #     # calculate brightness, and save results
+    #     generate_character_images()
+    #     process_character_images()
+    #     print("Font processed!")
+    
+    # root.destroy()
+    # # output name based on input video name
+    # config.output_video_path = sdir("output", f"{os.path.splitext(os.path.basename(config.input_video_path))[0]}.mp4") 
+    
+    # questions = [
+    #     inquirer.Text(
+    #         'fps',
+    #         message="Please enter the output video FPS (leave blank to match input)",
+    #         validate=lambda _, x: x.isdigit() or x == "",
+    #         default=config.output_video_fps,
+    #     ),
+    #     inquirer.Checkbox(
+    #         "character_set",
+    #         message="Please choose a character set (or multiple to combine)",
+    #         choices=["ASCII", "Extended ASCII", "Lowercase Alphabet", "Uppercase Alphabet",
+    #                  "Digits", "Symbols", "Hex", "Ramp", "All"],
+    #     ),
+    # ]
+
+    # answers = inquirer.prompt(questions)
+    # config.output_video_fps = int(answers["fps"]) if answers["fps"] else 0
+    # allow_all = "All" in answers["character_set"] or not answers["character_set"]
+    # allowed_cp = {
+    #     ord(c)
+    #     for cs in answers["character_set"]
+    #     for c in CHAR_SETS.get(cs, [])
+    # } if not allow_all else None
+    
+    # render_video(allowed_cp, allow_all)
+    # subprocess.run(["explorer", "/select,", config.output_video_path])
 
     
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        prog="ASCII Video Player",
+        description="ASCII-art video renderer/player",
+    )
+    group = parser.add_mutually_exclusive_group() 
+    group.add_argument("-g", "--gui", action="store_true", help="Launch the graphical UI")
+    group.add_argument("-c", "--cli", action="store_true", help="Launch the terminal UI (default)")
+    
+    parser.add_argument("-i", type=str, help="Path to the input video file")
+    parser.add_argument("-o", type=str, help="Path to the output video file")
+    parser.add_argument("-f", type=str, help="Path to the font file")
+    parser.add_argument("-fs", type=int, default=10, help="Font size for rendering")
+    parser.add_argument("-fps", type=int, default=0, help="Output video FPS (0 to match input)")
+    
+    args = parser.parse_args()
+    
+    config = Config()
+    config.input_video_path = args.i or config.input_video_path
+    config.font_name = args.f or config.font_name
+    config.font_path = args.f or config.font_path
+    config.font_size = args.fs or config.font_size
+    config.output_video_path = args.o or config.output_video_path
+    config.output_video_fps = args.fps or config.output_video_fps
+    config.script_path = os.path.dirname(os.path.abspath(__file__))
+    
+    clear_temp()
+    
+    if args.gui or (not args.cli and not sys.stdout.isatty()):
+        print('gui')
+        main_gui()
+    else:
+        print('cli')
+        main_cli()
+        
+    
     for i in range(5, 0, -1):
         print(f"Exiting in {i} seconds...", end="\r")
         sleep(1)

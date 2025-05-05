@@ -69,7 +69,7 @@ for k = 1:K
         inra = false; % ^^ attraction zone
         angInit = 0; % initial angle calculated from velocity vector
         angTarg = 0; % target angle calcualted from dir vector
-        dis1 = 0; dis2 = 0; % temporary variables for angular distance calculations
+        dif1 = 0; dif2 = 0; % temporary variables for angular distance calculations
         angFinal = 0; % final angle to turn to
         
         % __________________Determine zone for all other fish_________________

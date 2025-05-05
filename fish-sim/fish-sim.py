@@ -54,7 +54,7 @@ calc_time = 0 # time it took to calculate
 render_time = 0 # time it took to render
 t = 20 # simulation time, [sec]
 fps = 30 # frames per second
-dt = 1 / fps # time step, [sec]
+dt = 1.0 / fps # time step, [sec]
 # dt = 0.1 # time step, [sec]
 frames = int(t / dt) # number of frames = time of animation / time for each frame
 video_live = False
@@ -62,38 +62,82 @@ video_render = True
 
 # ______________Initial parameters________________
 
-total_fish = 10 # number of fish
-alpha = 270 # vision volume, [deg]
+sim_speed = 5
+
+N = 3 # number of fish
+alpha = 360 # vision volume, [deg]
 rr = 1 # zone of repulsion [units]
 ro = 5 # zone of orientation [units]
 ra = 15 # zone of attraction [units]
-omega = 60 # max rotation rate, [deg/sec]
-speed = 4 # speed of each fish, [units/sec]
+omega = 40 * sim_speed # max rotation rate, [deg/sec]
+speed = 3 * sim_speed # speed of each fish, [units/sec]
 
 # INITIALIZE FISH
 
 # ____random____
-r = 5 * random.rand(3, total_fish) - 2.5 # random positions around (0,0)
-v = random.rand(3, total_fish) - 0.5 # random velocity directions
-# r[3, :] = 0
-# v[3, :] = 0
+r = 5 * random.rand(3, N) - 2.5 # random positions around (0,0)
+v = random.rand(3, N) - 0.5 # random velocity directions
 
 # ____example 1____
-# r[:, 1] = [5, 0, 0]
-# r[:, 2] = [-5, 0, 0]
-# v[:, 1] = [-1, 0, 0]
-# v[:, 2] = [1, -1, 0]
+# r[:, 0] = [5, 0, 0]
+# r[:, 1] = [-5, 0, 0]
+# v[:, 0] = [-1, 0, 0]
+# v[:, 1] = [1, -1, 0]
 
 #____example 2____
-# r[:, 1] = [5, 0, 0]
-# r[:, 2] = [-5, 0, 0]
-# r[:, 3] = [0, 0, 0]
-# v[:, 1] = [0, 1, 0]
-# v[:, 2] = [0, 1, 0]
-# v[:, 3] = [0, -1, 0]
+r[:, 0] = [5, 0, 0]
+r[:, 1] = [-5, 0, 0]
+r[:, 2] = [0, 0, 0]
+v[:, 0] = [0, 1, 0]
+v[:, 1] = [0, 1, 0]
+v[:, 2] = [0, -1, 0]
 
-for i in range(total_fish): # normalize these vectors
+
+
+# r[:, 0] = [5, 0, 0]
+# r[:, 1] = [4, 5, -4]
+# r[:, 2] = [-1, 5, -1]
+
+# print(r)
+
+# r = np.array([
+#     [5,  4, -1],
+#     [0,  5,  5],
+#     [0, -4, -1]
+# ])
+
+# print(r)
+
+
+# v[:, 0] = [0, 1, 0]
+# v[:, 1] = [1, 7, -9]
+# v[:, 2] = [-1, 1, 1]
+
+# v = np.array([
+#     [0,  1, -1],
+#     [1,  7,  1],
+#     [0, -9,  1]
+# ]) 
+
+
+# r = np.array([
+#     [5,  4, -1, -3,  3,  4, -1, 2],
+#     [0,  5,  5, -1,  0, -1,  3, 1],
+#     [0, -4, -1,  4,  3,  2,  1, 5]
+# ], dtype=float)
+
+# v = np.array([
+#     [0,  1, -1,  2,  4, -3,  1,  0],
+#     [1,  7,  1,  2,  4, -1, -5, -3],
+#     [0, -9,  1,  6,  2,  3,  1,  1]
+# ], dtype=float) 
+
+# r[2, :] = 0
+# v[2, :] = 0
+
+for i in range(N): # normalize these vectors
     v[:, i] = v[:, i] / np.linalg.norm(v[:, i])
+
 
 if video_live:
     win_scale = 15
@@ -121,83 +165,153 @@ p_group = np.zeros((3, frames)) # COM linear momentum (equal to velocity if mass
 h_group = np.zeros((3, frames)) # angular momentum about COM
 r_inter = np.zeros((3, frames)) # distance of each fish from COM, used in calculating h_group
 
-delta = r[:, :, None] - r[:, None, :] # shape: (3, N, N)
-dists = np.linalg.norm(delta, axis=0) # shape: (N, N)
-
 # ______________________Loop for each frame to calculate____________________
 for frame in tqdm(range(frames), desc="Frames", unit="frame"):
     calc_start = perf_counter()
-    dir = np.zeros((3, total_fish)) # desired direction for each fish at the  of the frame
+    # print(f"frame {frame}, r avg = {np.mean(r[:2, :], axis=1)}")
+    dir = np.zeros((3, N)) # desired direction for each fish at the  of the frame
     
-    for n in range(total_fish):
-        dirTemp = np.zeros(3) # temporary desired direction
+    for n in range(N):
+        dis = np.zeros((3, N))
+        dirTemp = np.zeros((3, 1)) # temporary desired direction
+        tempIndex = np.zeros(N)
+        temp2 = np.zeros((3, N))
+        temp3 = np.zeros((3, N))
+        inrr = False
+        inro = False
+        inra = False
         angInit = 0 # initial angle calculated from velocity vector
         angTarg = 0 # target angle calcualted from dir vector
+        dif1 = 0
+        dif2 = 0
         angFinal = 0 # final angle to turn to
         
-        vecs = delta[:, :, n]  # shape: (3, N), vectors from fish n to all others
-        
-        # angle between v[:, n] and each vec
-        vnorm = np.linalg.norm(v[:, n])
-        vecnorms = np.linalg.norm(vecs, axis=0) + 1e-8
-        
-        dots = np.dot(v[:, n], vecs) # shape: (N,)
-        cosines = np.clip(dots / (vnorm * vecnorms), -1.0, 1.0)
-        angles = np.degrees(np.arccos(cosines)) # shape: (N,)
-        
-        tempIndex = np.full(total_fish, 3) # default to ignore
-        
-        # ignore self and fish outside field of view
-        fov_mask = (angles <= 0.5 * alpha)
-        fov_mask[n] = False # ignore self
-        
-        # distance masks
-        repulsion_mask = (dists[n] <= rr) & fov_mask
-        orientation_mask = (dists[n] <= ro) & fov_mask & ~repulsion_mask
-        attraction_mask = (dists[n] <= ra) & fov_mask & ~repulsion_mask & ~orientation_mask
-        
-        tempIndex[repulsion_mask] = 0
-        tempIndex[orientation_mask] = 1
-        tempIndex[attraction_mask] = 2
-
-        # repulsion
-        if np.any(repulsion_mask):
-            r_repel = r[:, repulsion_mask] # grab all positions of repulsion fish
-            target = np.mean(r_repel, axis=1) # mean position
-            target[2] = 0 # ignore z-axis
-            vec = r[:, n] - target
-            mag = np.linalg.norm(vec)
-            dir[:, n] = -vec / mag if mag > 1e-8 else np.zeros(3) # move away from average position
-            continue # repulsion overrides other behavior
-        
-        # attraction
-        if np.any(attraction_mask):
-            r_attract = r[:, attraction_mask] # grab all positions of attraction fish
-            target = np.mean(r_attract, axis=1) # mean position
-            target[2] = 0 # ignore z-axis
-            vec = target - r[:, n]
-            mag = np.linalg.norm(vec)
-            dir[:, n] = vec / mag if mag > 1e-8 else np.zeros(3) # move towards average position
-    
-        # orientation
-        if np.any(orientation_mask):
-            v_orient = v[:, orientation_mask] # grab all velocities of orientation fish
-            target = np.mean(v_orient, axis=1) # mean velocity
-            target[2] = 0 # ignore z-axis
-            dirTemp = target / np.linalg.norm(target) # normalized average direction
+        for i in range(N):
+            dis[:, i] = r[:, i] - r[:, n]
+            d = np.linalg.norm(dis[:, i])
             
-            if np.any(attraction_mask):
-                # blend onto the attraction direction already in dir[:, n]
-                mixed = 0.8 * dir[:, n] + 0.2 * dirTemp
-                mag = np.linalg.norm(mixed)
-                dir[:, n] = mixed / mag if mag > 1e-8 else np.zeros(3)
+            # if i == n:
+            #     tempIndex[i] = 3
+            #     continue
+
+            
+            #_____blind spot______
+            denom = np.linalg.norm(v[:, n]) * np.linalg.norm(dis[:, i])
+            if denom != 0:
+                dot_val = np.dot(v[:, n], dis[:, i]) / denom
+                # clamp to valid acos input range [-1, 1]
+                dot_val = np.clip(dot_val, -1.0, 1.0)
+                angle = acosd(dot_val)
             else:
-                # no attraction happened, so orientation overrides
+                angle = 0
+
+            # angle = acosd(np.dot(v[:, n], dis[:, i]) / np.linalg.norm(v[:, n]) / np.linalg.norm(dis[:, i]));  
+            
+            if angle > 0.5 * alpha:
+                tempIndex[i] = 3
+            
+            if (d <= rr) and (tempIndex[i] != 3):
+                tempIndex[i] = 0
+            elif (d <= ro) and (tempIndex[i] != 3):
+                tempIndex[i] = 1
+            elif (d <= ra) and (tempIndex[i] != 3):
+                tempIndex[i] = 2
+            else:
+                tempIndex[i] = 3
+                
+            tempIndex[n] = 3
+            
+        # repulsion zone
+        
+        fishCount = 0
+        for i in range(N):
+            if tempIndex[i] == 0:
+                inrr = True
+                fishCount = fishCount + 1
+        
+        if inrr:
+            for i in range(N):
+                if tempIndex[i] == 0:
+                    temp2[:, i] = r[:, i]
+            target = np.array([
+                np.sum(temp2[0, :] / fishCount),
+                np.sum(temp2[1, :] / fishCount),
+                0
+            ])
+            dir[:, n] = (r[:, n] - target) / np.linalg.norm(r[:, n] - target)
+            continue
+
+        # orientation zone
+        
+        fishCount = 0
+        for i in range(N):
+            if tempIndex[i] == 1:
+                inro = True
+                fishCount += 1
+                
+        if inro:
+            for i in range(N):
+                if tempIndex[i] == 1:
+                    temp2[:, i] = v[:, i]
+                    
+            target = np.array([
+                np.sum(temp2[0, :] / fishCount),
+                np.sum(temp2[1, :] / fishCount),
+                0
+            ])
+            # dirTemp = target / np.linalg.norm(target)
+            norm = np.linalg.norm(target)
+            if norm != 0:
+                dirTemp = target / norm
+            else:
+                dirTemp = np.zeros(3)
+
+            
+        # attraction zone
+        
+        fishCount = 0
+        for i in range(N):
+            if tempIndex[i] == 2:
+                inra = True
+                fishCount += 1
+    
+        if inra:
+            for i in range(N):
+                if tempIndex[i] == 2:
+                    temp3[:, i] = r[:, i]
+                    
+            target = np.array([
+                np.sum(temp3[0, :] / fishCount),
+                np.sum(temp3[1, :] / fishCount),
+                0
+            ])
+            # dir[:, n] = -(r[:, n] - target) / np.linalg.norm(r[:, n] - target)
+            vec = r[:, n] - target
+            norm = np.linalg.norm(vec)
+            if norm != 0:
+                dir[:, n] = -vec / norm
+            else:
+                dir[:, n] = np.zeros(3)
+            
+        # combine zones
+        
+        if inro:
+            if inra:
+                dir[:, n] = (0.8 * dir[:, n] + 0.2 * dirTemp)
+                # dir[:, n] = dir[:, n] / np.linalg.norm(dir[:, n])
+                norm = np.linalg.norm(dir[:, n])
+                if norm != 0:
+                    dir[:, n] = dir[:, n] / norm
+                else:
+                    dir[:, n] = np.zeros(3)
+            else:
                 dir[:, n] = dirTemp
+                
+    # print(f"fish dirs: {[np.round(np.linalg.norm(dir[:, i]), 3) for i in range(N)]}")
 
     #__________________________________MOVEMENT______________________________
     
-    for i in range(total_fish):
+    for i in range(N):
         
         # no fish in any zone, move in current direction
         if np.allclose(dir[:, i], 0):
@@ -233,36 +347,46 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
         
         # checks which direction is shortest, applies movement in that direction
         # omega * dt for smooth turning relative to time
-        if counterclockwise < clockwise :
-            angFinal = angTarg if counterclockwise < omega * dt else angInit + omega * dt
+        if counterclockwise < clockwise:
+            if counterclockwise < omega * dt:
+                angFinal = angTarg
+            else:
+                angFinal = angInit + omega * dt
         else:
-            angFinal = angTarg if clockwise < omega * dt else angInit - omega * dt
+            if clockwise < omega * dt:
+                angFinal = angTarg
+            else:
+                angFinal = angInit - omega * dt
                 
         angFinal = angFinal % 360
+        # if i == 0:
+            # print(f"fish {i}: angInit={angInit:.2f}, angTarg={angTarg:.2f}, angFinal={angFinal:.2f}")
+
+
         
         # set new velocity direction, and update position (move)
-        v[:, i] = [cosd(angFinal), sind(angFinal), 0]
+        v[:, i] = np.array([cosd(angFinal), sind(angFinal), 0])
         r[:, i] = r[:, i] +  speed * dt * v[:, i]
     
 
     # _____________________________MOMENTUM_ETC_________________________
 
     # center of mass / mean position of all fish
-    r_group[:, frame] = [np.mean(r[0, :]), np.mean(r[1, :]), 0]
+    r_group[:, frame] = np.array([np.mean(r[0, :]), np.mean(r[1, :]), 0])
     
     # average velocity / mean velocity of all fish
     v_group[:, frame] = speed * np.array([np.mean(v[0, :]), np.mean(v[1, :]), 0])
 
     # linear momentum / mean velocity of all fish
-    p_group[:, frame] = (speed / total_fish) * np.array([sum(v[0, :]), sum(v[1, :]), 0])
+    p_group[:, frame] = (speed / N) * np.array([sum(v[0, :]), sum(v[1, :]), 0])
 
     # angular momentum
     # for each fish, calculate distance from COM, then cross product with velocity
-    for j in range(total_fish):
+    for j in range(N):
         r_inter[0, j] = r[0, j] - r_group[0, frame]
         r_inter[1, j] = r[1, j] - r_group[1, frame]
         
-        h_group[:, frame] = h_group[:, frame] + speed/total_fish * np.cross(r_inter[:, j], v[:, j])
+        h_group[:, frame] = h_group[:, frame] + speed/N * np.cross(r_inter[:, j], v[:, j])
     
     calc_time += perf_counter() - calc_start
     #_______Animation stuff__________
@@ -304,7 +428,7 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
         
         draw_unit_grid(img, win_scale, frame_width, frame_height)
 
-        for i in range(total_fish):
+        for i in range(N):
             # convert position to screen coordinates
             x, y = world_to_screen(r[0, i], r[1, i], win_scale, frame_width, frame_height)
 
@@ -360,6 +484,6 @@ if video_render:
 # plt.ylabel("Angular Momentum around C.O.M.")
 # plt.show()
 
-print(f"Simulated {total_fish} fish and {frames} frames ({perf_counter() - start:.2f}s)")
+print(f"Simulated {N} fish and {frames} frames ({perf_counter() - start:.2f}s)")
 print(f"Calculation time: {calc_time:.2f}s")
 print(f"Render time: {render_time:.2f}s")

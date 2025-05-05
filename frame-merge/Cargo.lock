@@ -415,6 +415,7 @@ dependencies = [
 name = "frame-merge"
 version = "0.1.0"
 dependencies = [
+ "fuzzy-matcher",
  "image",
  "indicatif",
  "inquire",

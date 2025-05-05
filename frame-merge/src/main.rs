@@ -1,3 +1,4 @@
+#![allow(warnings)]
 
 use std::fs::create_dir_all;
 use std::io::ErrorKind;
@@ -7,11 +8,12 @@ use video_rs::decode::Decoder;
 use image::{ImageBuffer, Rgb};
 use tokio::task;
 use inquire::{
-    Text, CustomUserError, Text,
+    Text, CustomUserError,
     validator::{StringValidator, Validation},
     autocompletion::{Autocomplete, Replacement}
 };
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher;
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use indicatif::ProgressBar;
 
 
 fn ask_video_path() {
@@ -160,12 +162,14 @@ async fn main() -> Result<(), Box<dyn Error>>  {
     let (width, height) = decoder.size();
     let frame_rate = decoder.frame_rate(); // Assuming 30 FPS if not available
 
-    let max_duration = 2.0; // Max duration in seconds
-    // let max_frames = (frame_rate * max_duration).ceil() as usize;
+    let max_duration = 6.0; // Max duration in seconds
+    let max_frames = (frame_rate * max_duration).ceil() as usize;
 
     let mut frame_count = 0;
     let mut elapsed_time = 0.0;
     let mut tasks = vec![];
+
+    let progress_bar = ProgressBar::new(max_frames as u64);
 
     for frame in decoder.decode_iter() {
         if let Ok((_timestamp, frame)) = frame {
@@ -202,7 +206,7 @@ async fn main() -> Result<(), Box<dyn Error>>  {
         task.await.expect("task failed");
     }
 
-    println!("Saved {} frames in the '{}' directory ({}s)", frame_count, temp_folder.display(), start_time.elapsed().as_secs_f32());
+    println!("\nSaved {} frames in the '{}' directory ({}s)", frame_count, temp_folder.display(), start_time.elapsed().as_secs_f32());
 
     clear_temp();
     Ok(())

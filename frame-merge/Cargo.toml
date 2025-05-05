@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+fuzzy-matcher = "0.3.7"
 image = "0.25.6"
 indicatif = "0.17.11"
 inquire = "0.7.5"

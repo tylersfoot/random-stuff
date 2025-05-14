@@ -1,35 +1,75 @@
 #![allow(warnings)]
 
-use std::fs::create_dir_all;
+use std::fs::{create_dir_all, canonicalize};
 use std::io::ErrorKind;
 use std::io::{self, Write};
 use std::error::Error;
+use std::process;
+use std::path::{Path, PathBuf};
 use video_rs::decode::Decoder;
 use image::{ImageBuffer, Rgb};
 use tokio::task;
 use inquire::{
     Text, CustomUserError,
     validator::{StringValidator, Validation},
-    autocompletion::{Autocomplete, Replacement}
+    autocompletion::{Autocomplete, Replacement},
+    InquireError,
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use indicatif::ProgressBar;
 
 
-fn ask_video_path() {
-    let validator = |input: &str| if input.chars().count() > 140 {
-        Ok(Validation::Invalid("You're only allowed 140 characters.".into()))
-    } else {
-        Ok(Validation::Valid)
+
+
+/// Prompts the user for a video file path and validates it.
+/// 
+/// Prompts the user with `inquire`, using `FilePathCompleter` for path autocomplete.
+/// Validates the path using `video_rs` to check if the file is a valid video file.
+/// Returns the path to the video as a `String`.
+fn ask_video_path() -> String {
+    let validator = |input: &str| {
+        let path = Path::new(input);
+        if path.exists() && path.is_file() {
+            let mut decoder_res = Decoder::new(path);
+            if !decoder_res.is_err() {
+            let decoder = decoder_res.unwrap();
+                if decoder.duration().is_ok() 
+                    && decoder.size().0 > 0
+                    && decoder.size().1 > 0 {
+                    return Ok(Validation::Valid);
+                }
+            }
+        }
+        return Ok(Validation::Invalid("File is not a valid video file".into()));
     };
 
-    let status = Text::new("What are you thinking about?")
-    .with_validator(validator)
-    .prompt();
+    let current_dir = std::env::current_dir().unwrap();
+    let help_message = format!("Current directory: {}", current_dir.to_string_lossy());
 
-    match status {
-        Ok(status) => println!("Your status: {}", status),
-        Err(err) => println!("Error while publishing your status: {}", err),
+    loop {
+        let ans = Text::new("Enter video file path:")
+            .with_autocomplete(FilePathCompleter::default())
+            .with_help_message(&help_message)
+            .with_validator(validator)
+            .prompt();
+
+        match ans {
+            Ok(path) => {
+                let path_res = Path::new(&path).canonicalize();
+                if path_res.is_err() {
+                    continue;
+                }
+                return path_res.unwrap().to_string_lossy().to_string();
+            }
+            Err(err) => {
+                if matches!(err, InquireError::OperationCanceled | InquireError::OperationInterrupted) {
+                    println!("\nPrompt canceled. Exiting.");
+                } else {
+                    eprintln!("\nError: {}", err);
+                }
+                process::exit(0);
+            }
+        }
     }
 }
 
@@ -41,6 +81,81 @@ fn clear_temp() {
     }
     create_dir_all(&temp_folder).expect("failed to create temp folder");
 }
+
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>>  {
+    clear_temp();
+
+    let video_path = ask_video_path();
+    println!("Video path: {video_path}");
+
+    video_rs::init().unwrap();
+    // let path = std::env::current_dir().unwrap().join("video.mp4");
+
+    let mut decoder = Decoder::new(PathBuf::from(video_path)).unwrap();
+
+    // process::exit(0);
+
+    let temp_folder = std::env::temp_dir().join("frame-merge");
+
+    let (width, height) = decoder.size();
+    let frame_rate = decoder.frame_rate();
+
+    let max_duration = 6.0; // Max duration in seconds
+    let max_frames = (frame_rate * max_duration).ceil() as usize;
+
+    let mut frame_count = 0;
+    let mut elapsed_time = 0.0;
+    let mut tasks = vec![];
+
+    let progress_bar = ProgressBar::new(max_frames as u64);
+
+    let start_time = std::time::Instant::now();
+    for frame in decoder.decode_iter() {
+        if let Ok((_timestamp, frame)) = frame {
+            if elapsed_time > max_duration {
+                break;
+            }
+
+            let rgb = frame.slice(ndarray::s![.., .., 0..3]).to_slice().unwrap();
+
+            let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, rgb.to_vec())
+            .expect("failed to create image buffer");
+
+            let frame_path = format!("{}/frame_{:05}.png", temp_folder.display(), frame_count);
+
+            let task = task::spawn_blocking(move || {
+                img.save(&frame_path).expect("failed to save frame");
+            });
+
+            tasks.push(task);
+
+            frame_count += 1;
+            elapsed_time += 1.0 / frame_rate;
+
+            print!("Saved frame {} at time {:.2} seconds\r", frame_count, elapsed_time);
+            io::stdout().flush().unwrap();
+        } else {
+            break;
+        }
+    }
+
+
+    // await all tasks to finish
+    for task in tasks {
+        task.await.expect("task failed");
+    }
+
+    println!("\nSaved {} frames in the '{}' directory ({}s)", frame_count, temp_folder.display(), start_time.elapsed().as_secs_f32());
+
+    clear_temp();
+    Ok(())
+}
+
+
+
+
 
 #[derive(Clone, Default)]
 pub struct FilePathCompleter {
@@ -77,12 +192,14 @@ impl FilePathCompleter {
             fallback_parent.clone()
         };
 
+
         let entries = match std::fs::read_dir(scan_dir) {
-            Ok(read_dir) => Ok(read_dir),
-            Err(err) if err.kind() == ErrorKind::NotFound => std::fs::read_dir(fallback_parent),
+            Ok(read_dir) => read_dir.collect::<Result<Vec<_>, _>>(),
+            Err(err) if err.kind() == ErrorKind::NotFound => {
+                std::fs::read_dir(fallback_parent)?.collect::<Result<Vec<_>, _>>()
+            }
             Err(err) => Err(err),
-        }?
-        .collect::<Result<Vec<_>, _>>()?;
+        }?;
 
         for entry in entries {
             let path = entry.path();
@@ -140,74 +257,4 @@ impl Autocomplete for FilePathCompleter {
                 .unwrap_or(Replacement::None)
         })
     }
-}
-
-
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>>  {
-    clear_temp();
-
-    ask_video_path();
-
-
-
-    video_rs::init().unwrap();
-
-    let start_time = std::time::Instant::now();
-    let mut decoder = Decoder::new(std::env::current_dir().unwrap().join("video.mp4")).unwrap();
-
-    let temp_folder = std::env::temp_dir().join("frame-merge");
-
-    let (width, height) = decoder.size();
-    let frame_rate = decoder.frame_rate(); // Assuming 30 FPS if not available
-
-    let max_duration = 6.0; // Max duration in seconds
-    let max_frames = (frame_rate * max_duration).ceil() as usize;
-
-    let mut frame_count = 0;
-    let mut elapsed_time = 0.0;
-    let mut tasks = vec![];
-
-    let progress_bar = ProgressBar::new(max_frames as u64);
-
-    for frame in decoder.decode_iter() {
-        if let Ok((_timestamp, frame)) = frame {
-            if elapsed_time > max_duration {
-                break;
-            }
-
-            let rgb = frame.slice(ndarray::s![.., .., 0..3]).to_slice().unwrap();
-
-            let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_raw(width, height, rgb.to_vec())
-            .expect("failed to create image buffer");
-
-            let frame_path = format!("{}/frame_{:05}.png", temp_folder.display(), frame_count);
-
-            let task = task::spawn_blocking(move || {
-                img.save(&frame_path).expect("failed to save frame");
-            });
-
-            tasks.push(task);
-
-            frame_count += 1;
-            elapsed_time += 1.0 / frame_rate;
-
-            print!("Saved frame {} at time {:.2} seconds\r", frame_count, elapsed_time);
-            io::stdout().flush().unwrap();
-        } else {
-            break;
-        }
-    }
-
-
-    // await all tasks to finish
-    for task in tasks {
-        task.await.expect("task failed");
-    }
-
-    println!("\nSaved {} frames in the '{}' directory ({}s)", frame_count, temp_folder.display(), start_time.elapsed().as_secs_f32());
-
-    clear_temp();
-    Ok(())
 }

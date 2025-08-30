@@ -1,6 +1,0 @@
-C:\Users\tyler\Desktop\GitHub\random-stuff\Limbo\obj\Debug\net8.0\Limbo.csproj.AssemblyReference.cache
-C:\Users\tyler\Desktop\GitHub\random-stuff\Limbo\obj\Debug\net8.0\Limbo.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\tyler\Desktop\GitHub\random-stuff\Limbo\obj\Debug\net8.0\Limbo.AssemblyInfoInputs.cache
-C:\Users\tyler\Desktop\GitHub\random-stuff\Limbo\obj\Debug\net8.0\Limbo.AssemblyInfo.cs
-C:\Users\tyler\Desktop\GitHub\random-stuff\Limbo\obj\Debug\net8.0\Limbo.csproj.CoreCompileInputs.cache
-C:\Users\tyler\Desktop\GitHub\random-stuff\Limbo\obj\Debug\net8.0\Limbo.sourcelink.json

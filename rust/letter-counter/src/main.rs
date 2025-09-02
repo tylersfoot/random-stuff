@@ -127,6 +127,7 @@ fn main() {
     // }
     // print!("{}", result);
 
+
     // ~750ms
     // let mut text = String::new();
     // file.read_to_string(&mut text).unwrap();
@@ -185,7 +186,7 @@ fn main() {
 
     
     let mmap = unsafe { Mmap::map(&file).unwrap() };
-    let chunk_size = 16 * 1024;
+    let chunk_size = 100 * 1024;
     let letter_counts = mmap
         .par_chunks(chunk_size)
         .fold(|| [0usize; 26], #[inline(always)] |mut local_counts, chunk| {
@@ -208,7 +209,7 @@ fn main() {
     for (i, &count) in letter_counts.iter().enumerate() {
         if count > 0 {
             let letter = (b'a' + i as u8) as char;
-            write!(result, "{}: {}\n", letter, count).unwrap();
+            writeln!(result, "{}: {}", letter, count).unwrap();
         }
     }
     print!("{}", result);

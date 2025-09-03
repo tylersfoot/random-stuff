@@ -35,7 +35,7 @@ fn wait(millis: u64) {
 }
 
 fn rgb_to_hex(r: u8, g: u8, b: u8) -> String {
-    format!("{:02X}{:02X}{:02X}", r, g, b)
+    format!("{r:02X}{g:02X}{b:02X}")
 }
 
 fn color_text(text: &str, color: &str) -> String {
@@ -53,7 +53,7 @@ fn color_text(text: &str, color: &str) -> String {
     // `;r;g;b` 8-bit color channel values
     // `m` apply to following text
     // `\x1b[0m` resets all attributes
-    format!("\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, text)
+    format!("\x1b[38;2;{r};{g};{b}m{text}\x1b[0m")
 }
 
 fn color_background(text: &str, color: &str) -> String {
@@ -64,7 +64,7 @@ fn color_background(text: &str, color: &str) -> String {
     let b = u8::from_str_radix(&h[4..6], 16).unwrap();
 
     // `48` sets background color
-    format!("\x1b[48;2;{};{};{}m{}\x1b[0m", r, g, b, text)
+    format!("\x1b[48;2;{r};{g};{b}m{text}\x1b[0m")
 }
 
 fn color_to_state(color: &str) -> Option<(State, u8)> {
@@ -256,7 +256,7 @@ impl Board {
                     wait(50);
                 }
                 Err(error) => {
-                    println!("move mouse error: {}", error);
+                    println!("move mouse error: {error}");
                     exit(0);
                 }
             }
@@ -360,8 +360,8 @@ impl Board {
 
         // print!("\x1b[?1049h"); // switch to alternate screen
         // wait(1000);
-        println!("{}", board_text);
-        println!("{:<60}", status);
+        println!("{board_text}");
+        println!("{status:<60}");
         // wait(1000);
         // print!("\x1b[?1049l");
     }
@@ -388,12 +388,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 exit(0);
             }
         }) {
-            println!("Error: {:?}", error)
+            println!("Error: {error:?}")
         }
     });
 
     for i in (1..=2).rev() {
-        print!("\rstarting in {}...", i);
+        print!("\rstarting in {i}...");
         Write::flush(&mut io::stdout()).unwrap();
         wait(1000);
     }
@@ -587,7 +587,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             should_update = true;
                             continue 'main;
                         }
-                        board.display_board(&format!("Marking cell ({},{}) solved: All surrounding mines flagged", x, y));
+                        board.display_board(&format!("Marking cell ({x},{y}) solved: All surrounding mines flagged"));
                         wait(wait_time);
                         board.set_cell_solved(x, y, true);
                         continue 'main;

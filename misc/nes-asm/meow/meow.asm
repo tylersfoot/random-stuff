@@ -74,13 +74,17 @@ LoadPalettesLoop:
   CPX #$20
   BNE LoadPalettesLoop  ; if x = $20 (32), all 32 bytes are copied, continue
 
-  ; set attributes for sprite 0
-  LDA #$80
-  STA $0200        ; put sprite 0 in center ($80) of screen vertically
-  STA $0203        ; put sprite 0 in center ($80) of screen horizontally
-  LDA #$00
-  STA $0201        ; tile number = 0 (use first tile in the pattern table)
-  STA $0202        ; use first color palette, don't flip sprite
+LoadSprites:
+  LDX #$00            ; start at 0
+LoadSpritesLoop:
+  ; load sprites into RAM
+  LDA sprites, x      ; load data from address (sprites +  x)
+  STA $0200, x        ; store into RAM address ($0200 + x)
+  INX                 ; X = X + 1
+  CPX #$20            ; Compare X to hex $20 (32)
+  BNE LoadSpritesLoop ; Branch to LoadSpritesLoop if compare was Not Equal to zero
+                      ; if compare was equal to 32, keep going down
+
 
   LDA #%10000000   ; enable NMI, sprites from Pattern Table 0
   STA $2000
@@ -88,10 +92,13 @@ LoadPalettesLoop:
   LDA #%00010000   ; enable sprite rendering
   STA $2001
 
-Forever:
-  ; runs an infinite loop
-  JMP Forever 
-  
+Forever: ; runs an infinite loop
+  JMP Forever
+
+
+;;;;;;;;;;;;;; VBlank Period
+
+
 NMI: ; Non-Maskable Interrupt - beginning of VBlank period, pause code (saved in stack) and run:
   ; transfer sprites using DMA (Direct Memory Transfer)
   ; by copying a block of RAM from CPU memory to PPU sprite memory
@@ -100,8 +107,136 @@ NMI: ; Non-Maskable Interrupt - beginning of VBlank period, pause code (saved in
   LDA #$02     ; $02 = page
   STA $4014    ; set the high byte (02) of the RAM address
                ; writing to $4014 triggers the DMA
-  
-  RTI          ; Return From Interrupt - return state from stack and resume code
+
+LatchController:
+  LDA #$01
+  STA $4016
+  LDA #$00
+  STA $4016    ; tell both controllers to latch buttons
+
+
+ReadA: ; A button on controller 1
+  LDA $4016
+  AND #%00000001
+  BEQ ReadADone
+
+ReadADone:
+
+ReadB: ; B button on controller 1
+  LDA $4016
+  AND #%00000001
+  BEQ ReadBDone
+ReadBDone:
+
+ReadSelect: ; Select button on controller 1
+  LDA $4016
+  AND #%00000001
+  BEQ ReadSelectDone
+ReadSelectDone:
+
+ReadStart: ; Start button on controller 1
+  LDA $4016
+  AND #%00000001
+  BEQ ReadStartDone
+ReadStartDone:
+
+; Sprite Movement - for each sprite: 
+; 1. load position LDA (X = $0203, Y = $0200)
+; 2. set carry flag (add = CLC, sub = SEC)
+; 3. add/sub (ADC or SBC)
+; 4. save position STA (X = $0203, Y = $0200)
+
+ReadUp: ; Up button on controller 1
+  LDA $4016
+  AND #%00000001
+  BEQ ReadUpDone
+  LDA $0200
+  SEC
+  SBC #$01
+  STA $0200
+  LDA $0204
+  SEC
+  SBC #$01
+  STA $0204
+  LDA $0208
+  SEC
+  SBC #$01
+  STA $0208
+  LDA $020C
+  SEC
+  SBC #$01
+  STA $020C
+ReadUpDone:
+
+ReadDown: ; Down button on controller 1
+  LDA $4016
+  AND #%00000001
+  BEQ ReadDownDone
+  LDA $0200
+  CLC
+  ADC #$01
+  STA $0200
+  LDA $0204
+  CLC
+  ADC #$01
+  STA $0204
+  LDA $0208
+  CLC
+  ADC #$01
+  STA $0208
+  LDA $020C
+  CLC
+  ADC #$01
+  STA $020C
+ReadDownDone:
+
+ReadLeft: ; Left button on controller 1
+  LDA $4016
+  AND #%00000001
+  BEQ ReadLeftDone
+  LDA $0203
+  SEC
+  SBC #$01
+  STA $0203
+  LDA $0207
+  SEC
+  SBC #$01
+  STA $0207
+  LDA $020B
+  SEC
+  SBC #$01
+  STA $020B
+  LDA $020F
+  SEC
+  SBC #$01
+  STA $020F
+ReadLeftDone:
+
+ReadRight: ; Right button on controller 1
+  LDA $4016
+  AND #%00000001    ; only look at bit 0
+  BEQ ReadRightDone ; branch to ReadRightDone if button is NOT pressed (0)
+                    ; add instructions here to do something when button IS pressed (1)
+  LDA $0203         ; load sprite X position
+  CLC               ; make sure the carry flag is clear
+  ADC #$01          ; A = A + 1
+  STA $0203         ; save sprite X position
+  LDA $0207
+  CLC
+  ADC #$01
+  STA $0207
+  LDA $020B
+  CLC
+  ADC #$01
+  STA $020B
+  LDA $020F
+  CLC
+  ADC #$01
+  STA $020F
+ReadRightDone:      ; handling this button is done
+
+
+  RTI ; Return From Interrupt - return state from stack and resume code
 
 
 ;;;;;;;;;;;;;;  
@@ -112,6 +247,13 @@ NMI: ; Non-Maskable Interrupt - beginning of VBlank period, pause code (saved in
 palette: ; sets the color palette for the background and sprites
   .db $0F,$31,$32,$33,$0F,$35,$36,$37,$0F,$39,$3A,$3B,$0F,$3D,$3E,$0F
   .db $0F,$1C,$15,$14,$0F,$02,$38,$3C,$0F,$1C,$15,$14,$0F,$02,$38,$3C
+
+sprites: ; sprites 0 to 3
+    ; vert tile attr horiz
+  .db $80, $32, $00, $80 ; sprite 0
+  .db $80, $33, $00, $88 ; sprite 1
+  .db $88, $34, $00, $80 ; sprite 2
+  .db $88, $35, $00, $88 ; sprite 3
   
   .org $FFFA   ; first of the three vectors starts here
   .dw NMI      ; when an NMI happens (once per frame if enabled) the processor will jump to the label NMI:

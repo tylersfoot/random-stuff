@@ -48,7 +48,7 @@ fn perform_fft(audio_samples: &[i32]) -> Vec<f32> {
 }
 
 fn main() -> Result<(), hound::Error> {
-    let path = "orbital.wav";
+    let path = "dimension.wav";
 
     // -------- rodio playback
     let stream_handle = rodio::OutputStreamBuilder::open_default_stream()
@@ -58,7 +58,7 @@ fn main() -> Result<(), hound::Error> {
     let source = Decoder::try_from(file).unwrap();
     sink.pause();
     sink.append(source);
-    sink.set_volume(1.0);
+    sink.set_volume(0.2);
 
     // -------- hound wav reading
     let mut reader = hound::WavReader::open(path)?;
@@ -75,10 +75,10 @@ fn main() -> Result<(), hound::Error> {
 
     wait(1000);
 
-    let w_waveform = 420;
-    let w_eq = 420;
-    let h_waveform = 40;
-    let h_eq = 30;
+    let w_waveform = 200;
+    let w_eq = 200;
+    let h_waveform = 20;
+    let h_eq = 20;
     let mut waveform_grid = HashMap::new();
     let mut eq_grid = HashMap::new();
 
@@ -115,7 +115,7 @@ fn main() -> Result<(), hound::Error> {
     let mut eq_bar_heights: Vec<f32> = vec![0.0; w_eq];
     let falloff_speed = 0.95; // 5% falloff per frame
 
-    let delay = 200; // ms visual offset, increase if visuals are early
+    let delay = 000; // ms visual offset, increase if visuals are early
 
     sink.play();
 

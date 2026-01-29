@@ -2,3 +2,13 @@ fish-sim/movie.mp4
 fish-sim/movie_2.mp4
 fish-sim/movie.mp4
 rust/rat-slime/songs/legacyweapon cover.mp3
+
+# Junk and temporary files
+*.tmp
+*.bak
+*.backup
+*.img
+tempCodeRunnerFile.py
+__pycache__/
+*.pyc
+target/

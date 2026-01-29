@@ -48,7 +48,7 @@ fn perform_fft(audio_samples: &[i32]) -> Vec<f32> {
 }
 
 fn main() -> Result<(), hound::Error> {
-    let path = "dimension.wav";
+    let path = "orbital.wav";
 
     // -------- rodio playback
     let stream_handle = rodio::OutputStreamBuilder::open_default_stream()
@@ -75,10 +75,10 @@ fn main() -> Result<(), hound::Error> {
 
     wait(1000);
 
-    let w_waveform = 200;
-    let w_eq = 200;
-    let h_waveform = 20;
-    let h_eq = 20;
+    let w_waveform = 300;
+    let w_eq = 300;
+    let h_waveform = 30;
+    let h_eq = 30;
     let mut waveform_grid = HashMap::new();
     let mut eq_grid = HashMap::new();
 

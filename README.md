@@ -1,113 +1,128 @@
 # random-stuff
 
-This repository is filled with scripts and projects that are:
+This repository is a collection of scripts, prototypes, and experiments that are:
 
 - Too small for their own repository
-- Unfinished
-- Something I just wanted to play around with or test
+- Unfinished or proof-of-concepts
+- Things I just wanted to play around with or learn about
 
 This README gives a brief summary of each project, sorted by programming language/engine (following the folder structure).
 
+## Table of Contents
+
+- [Rust](#rust)
+- [Python](#python)
+- [Godot](#godot)
+- [Misc](#misc)
+
+---
+
 ## Rust
 
-#### color-reduction-clustering
+### [color-reduction-clustering](./rust/color-reduction-clustering/)
 
-A program that takes an image and reduces its color pallete (color quantization) using a multithreaded K-means clustering algorithm in 3D space with RGB as the axes.
+A program that performs color quantization on images. It uses a multithreaded K-means clustering algorithm in 3D space (using RGB as axes) to drastically reduce an image's color palette while preserving its visual identity.
 
-#### fft
+### [fft](./rust/fft/)
 
-A terminal audio visualizer that uses Fast Fourier Transform (FFT) to display a waveform and frequency analyzer.
+A terminal audio visualizer. It uses Fast Fourier Transform (FFT) to process audio data and display a real-time waveform and frequency analyzer in the terminal.
 
-#### fluXis-bad-apple
+### [fluXis-bad-apple](./rust/fluXis-bad-apple/)
 
-A script that converts the Bad Apple video into a FluXis map. It uses FFmpeg to extract and downscale the frames, and turns the pixel data into notes to render each frame. It uses scroll velocity to animate the frames.
+A script that converts the Bad Apple video into a map for the rhythm game FluXis. It uses FFmpeg to extract and downscale frames, and translates the pixel brightness into note placement and scroll velocity events to animate the video's frames on the playfield.
 
-#### frame-merge
+### [frame-merge](./rust/frame-merge/)
 
-TODO
+A WIP utility for blending frames together in a video.
 
-#### letter-counter
+### [letter-counter](./rust/letter-counter/)
 
-A script that counts the number of each letter in a text file. I kept rewriting/improving it to see how fast I could make it. Originally a school project.
+A high-performance script that benchmarks counting letter frequencies in a text file. It started of as a school assignment, and I kept optimizing it to see how fast I could make it.
 
-#### mandelbrot-rust
+### [mandelbrot-rust](./rust/mandelbrot-rust/)
 
-An attempt to rewrite my Python mandelbrot fractal generator in Rust.
+A port of my Python fractal generator to Rust. It generated high-resolution renders of the Mandelbrot set, using Rust's concurrency for faster calculations.
 
-#### mania-bot
+### [mania-bot](./rust/mania-bot/)
 
-A bot that plays osu!mania really good. It constantly captures the screen, detects if there are notes near the receptors, and simulates the key presses accordingly.
+A bot that automaatically plays osu!mania. It captures the screen in real-time, detects notes approaching the receptors, and simulates key presses to play automatically.
 
-#### minesweeper
+### [minesweeper](./rust/minesweeper/)
 
-TODO
+A WIP terminal-based Minesweeper game.
 
-#### minesweeper-solver
+### [minesweeper-solver](./rust/minesweeper-solver/)
 
-An automated minesweeper solver. It reads the game board by capturing the screen, and uses colors to determine the cell states. It calculates which tiles are safe or have mines, falling back on random guesses when stuck. It automatically moves the mouse and clicks on cells to progess. Features a live ASCII representation of the board in the terminal while it runs.
+An automated Minesweeper solver. It captures the screen to read the board state, and uses a logic algorithm to flag mines and reveal safe tiles. It falls back to random guessing when logically stuck. Features a cool live ASCII version of the board in the terminal to visualize the bot's "thought process".
 
-#### rat-slime
+### [rat-slime](./rust/rat-slime/)
 
-A music player for the terminal, built with `ratatui` and `rodio`. It handles mp3 metadata, and features a playback queue, volume/speed controls, and playlist looping logic. No, I don't know why I named it that.
+A music player for the terminal, built with `ratatui` and `rodio`. It handles MP3 metadata, and features a playback queue, volume/speed controls, and playlist looping logic. No, I don't know why I named it that.
 
-#### rust-anim
+### [rust-anim](./rust/rust-anim/)
 
-A terminal animation of the sea built with `ratatui`. Uses Perlin noise to animate waves, color gradients, and the sky.
+A terminal-based ambient animation of the sea, built with `ratatui`. It uses Perlin noise to generate dynamic waves and sky gradients that shift based on the time of day.
+
+---
 
 ## Python
 
-#### ascii-video-player
+### [ascii-video-player](./python/ascii-video-player/)
 
-A CLI and GUI tool that processes video files into ASCII art animations, rendered out to mp4 files. It uses custom font analysis that maps pixel brightness to character density.
+A CLI and GUI tool that processes video files into high-resolution ASCII art animations. It analyzes any font's character density to map pixel brightness to specific characters.
 
-#### fish-sim
+### [fish-sim](./python/fish-sim/)
 
 My attempt to rewrite my friend's fish simulation from Matlab to Python. It's a Boids flocking simulation that models fish behavior using zones of repulsion, orientation, and attraction. Uses `OpenCV` to render a video of the simulation.
 
-#### GDI-PY
+### [GDI-PY](./python/fish-sim/)
 
-A joke "malware" program. It uses the Windows GDI API to cause the screen to glitch and artifact, such as melting, tunneling, and inverting colors. Also has ByteBeat audio that goes along with it. Inspired by old joke malware, such as the MEMZ virus.
+A "joke malware" program. It uses the Windows GDI API to cause the screen to glitch and artifact, with payloads such as melting, tunneling, and inverting colors. Also has math-based ByteBeat audio to play along with it. Inspired by old joke malware, such as the MEMZ trojan.
 
-#### mandelbrot-python
+### [mandelbrot-python](./python/mandelbrot-python/)
 
 A script that generates high-resolution images of the Mandelbrot set fractal. Uses `numpy` for vectorized complex number calculations, and supports custom color gradients.
 
-#### sorting-alg
+### [sorting-alg](./python/sorting-alg/)
 
-A simple sorting algorithm (selection sort).
+A simple manual implementation of the Selection Sort algorithm to learn how it works.
+
+---
 
 ## Godot
 
-#### astral-eternity
+### [astral-eternity](./godot/astral-eternity/)
 
-A demo that simulates metaball projectiles, uses shaders to show a different background inside the metaballs, and a pixel outline shader.
+A demo that simulates metaball projectiles. Uses custom shaders for masking backgrounds inside the metaballs and rendering pixel perfect outlines.
 
-#### non-euclidean
+### [non-euclidean](./godot/non-euclidean/)
 
-A project experimenting with making seamless portals in Godot with shaders, with a first-person controller.
+An experiment in creating seamless, non-Euclidean portals using shaders and a first-person controller.
 
-#### shader-test
+### [shader-test](./godot/shader-test/)
 
-A playground project for testing or experimenting with various shaders.
+A playground project for testing or experimenting with various shaders and effects.
+
+---
 
 ## Misc
 
-#### GDI-CS
+### [bootloader](./misc/bootloader/)
 
-A C# implementation of the joke malware, translated from the Python version.
+A project for learning and exploring x86 bootloaders, inspired by the bootloader featured in the MEMZ trojan.
 
-#### bootloader
+### [end-portal-wallpaper](./misc/end-portal-wallpaper/)
 
-A project for learning x86 bootloaders written in ASM, inspired by the bootloader featured in the MEMZ virus.
+An animated wallpaper simulating the Minecraft End Portal effect, using a shader running on WebGL. [View on Wallpaper Engine](https://steamcommunity.com/sharedfiles/filedetails/?id=3185732456)!
 
-#### end-portal-wallpaper
+### [GDI-CS](./misc/GDI-CS/)
 
-A WebGB animated wallpaper background, simulating the end portal effect from Minecraft. Can be found on [Wallpaper Engine](https://steamcommunity.com/sharedfiles/filedetails/?id=3185732456)!
+A C# port of the joke malware script.
 
-#### image-corruption
+### [image-corruption](./misc/image-corruption/)
 
-A tool to corrupt images for glitch art by directly prodding at the raw binary data.
+A glitch art tool to corrupt images by prodding at the raw binary data to create visual artifacts.
 
-#### nes-asm
+### [nes-asm](./misc/nes-asm/)
 
 A project for taking notes and learning NES programming in 6502 assembly.

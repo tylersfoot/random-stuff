@@ -113,7 +113,7 @@ A project for learning and exploring x86 bootloaders, inspired by the bootloader
 
 ### [end-portal-wallpaper](./misc/end-portal-wallpaper/)
 
-An animated wallpaper simulating the Minecraft End Portal effect, using a shader running on WebGL. [View on Wallpaper Engine](https://steamcommunity.com/sharedfiles/filedetails/?id=3185732456)!
+An animated wallpaper simulating the Minecraft End Portal effect, using a shader running on WebGL. [View on Wallpaper Engine](https://steamcommunity.com/sharedfiles/filedetails/?id=3185732456)
 
 ### [GDI-CS](./misc/GDI-CS/)
 

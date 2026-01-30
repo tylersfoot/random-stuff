@@ -40,8 +40,6 @@ python/mandelbrot-python
 
 python/sorting-alg
 
-python/spotify-downloader
-
 ## Godot
 
 godot/astral-eternity

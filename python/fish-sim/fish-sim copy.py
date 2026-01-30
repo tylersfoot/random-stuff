@@ -12,7 +12,7 @@ import cv2
 
 
 def acosd(x):
-    return np.degrees(np.arccos(x)) 
+    return np.degrees(np.arccos(x))
 
 def atan2d(x, y):
     return np.degrees(np.arctan2(x, y))
@@ -101,7 +101,7 @@ if video_live:
     win_scale = 15
     window = [-win_scale, win_scale, -win_scale, win_scale]
     writer = imageio.get_writer("movie.mp4", fps=1/dt)
-    
+
     fig = plt.figure(figsize=(6.4, 6.4), dpi=100)
     ax = plt.gca()
     ax.set_aspect('equal', adjustable='box')
@@ -130,34 +130,34 @@ dists = np.linalg.norm(delta, axis=0) # shape: (N, N)
 for frame in tqdm(range(frames), desc="Frames", unit="frame"):
     calc_start = perf_counter()
     dir = np.zeros((3, total_fish)) # desired direction for each fish at the  of the frame
-    
+
     for n in range(total_fish):
         dirTemp = np.zeros(3) # temporary desired direction
         angInit = 0 # initial angle calculated from velocity vector
         angTarg = 0 # target angle calcualted from dir vector
         angFinal = 0 # final angle to turn to
-        
+
         vecs = delta[:, :, n]  # shape: (3, N), vectors from fish n to all others
-        
+
         # angle between v[:, n] and each vec
         vnorm = np.linalg.norm(v[:, n])
         vecnorms = np.linalg.norm(vecs, axis=0) + 1e-8
-        
+
         dots = np.dot(v[:, n], vecs) # shape: (N,)
         cosines = np.clip(dots / (vnorm * vecnorms), -1.0, 1.0)
         angles = np.degrees(np.arccos(cosines)) # shape: (N,)
-        
+
         tempIndex = np.full(total_fish, 3) # default to ignore
-        
+
         # ignore self and fish outside field of view
         fov_mask = (angles <= 0.5 * alpha)
         fov_mask[n] = False # ignore self
-        
+
         # distance masks
         repulsion_mask = (dists[n] <= rr) & fov_mask
         orientation_mask = (dists[n] <= ro) & fov_mask & ~repulsion_mask
         attraction_mask = (dists[n] <= ra) & fov_mask & ~repulsion_mask & ~orientation_mask
-        
+
         tempIndex[repulsion_mask] = 0
         tempIndex[orientation_mask] = 1
         tempIndex[attraction_mask] = 2
@@ -171,7 +171,7 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
             mag = np.linalg.norm(vec)
             dir[:, n] = vec / mag if mag > 1e-8 else np.zeros(3) # move away from average position
             continue # repulsion overrides other behavior
-        
+
         # attraction
         if np.any(attraction_mask):
             r_attract = r[:, attraction_mask] # grab all positions of attraction fish
@@ -180,14 +180,14 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
             vec = target - r[:, n]
             mag = np.linalg.norm(vec)
             dir[:, n] = vec / mag if mag > 1e-8 else np.zeros(3) # move towards average position
-    
+
         # orientation
         if np.any(orientation_mask):
             v_orient = v[:, orientation_mask] # grab all velocities of orientation fish
             target = np.mean(v_orient, axis=1) # mean velocity
             target[2] = 0 # ignore z-axis
             dirTemp = target / np.linalg.norm(target) # normalized average direction
-            
+
             if np.any(attraction_mask):
                 # blend onto the attraction direction already in dir[:, n]
                 mixed = 0.8 * dir[:, n] + 0.2 * dirTemp
@@ -198,27 +198,27 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
                 dir[:, n] = dirTemp
 
     #__________________________________MOVEMENT______________________________
-    
+
     for i in range(total_fish):
-        
+
         # no fish in any zone, move in current direction
         if np.allclose(dir[:, i], 0):
             r[:, i] = r[:, i] + speed * dt * v[:, i]
-            continue  
+            continue
 
         angFinal = 0
-        
+
         # current velocity angle (deg)
         angInit = atan2d(v[1, i], v[0, i])
         if angInit < 0:
             angInit = angInit + 360
-        
+
 
         # target angle (deg)
         angTarg = atan2d(dir[1, i], dir[0, i])
         if angTarg < 0:
             angTarg = angTarg + 360
-        
+
 
         # calculates clockwise and counterclockwise distances between angles
         dif1 = angTarg - angInit
@@ -231,27 +231,27 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
             # first distance is neg, set abs(dif1) -> neg, dif2 -> pos
             counterclockwise = dif2
             clockwise = abs(dif1)
-        
-        
+
+
         # checks which direction is shortest, applies movement in that direction
         # omega * dt for smooth turning relative to time
         if counterclockwise < clockwise :
             angFinal = angTarg if counterclockwise < omega * dt else angInit + omega * dt
         else:
             angFinal = angTarg if clockwise < omega * dt else angInit - omega * dt
-                
+
         angFinal = angFinal % 360
-        
+
         # set new velocity direction, and update position (move)
         v[:, i] = [cosd(angFinal), sind(angFinal), 0]
         r[:, i] = r[:, i] +  speed * dt * v[:, i]
-    
+
 
     # _____________________________MOMENTUM_ETC_________________________
 
     # center of mass / mean position of all fish
     # r_group[:, frame] = [np.mean(r[0, :]), np.mean(r[1, :]), 0]
-    
+
     # average velocity / mean velocity of all fish
     # v_group[:, frame] = speed * np.array([np.mean(v[0, :]), np.mean(v[1, :]), 0])
 
@@ -263,9 +263,9 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
     # for j in range(total_fish):
     #     r_inter[0, j] = r[0, j] - r_group[0, frame]
     #     r_inter[1, j] = r[1, j] - r_group[1, frame]
-        
+
     #     h_group[:, frame] = h_group[:, frame] + speed/total_fish * np.cross(r_inter[:, j], v[:, j])
-    
+
     calc_time += perf_counter() - calc_start
     #_______Animation stuff__________
     if video_live:
@@ -276,7 +276,7 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
         # update quiver (arrows for velocity)
         quivers.set_offsets(r[:2, :].T)
         quivers.set_UVC(v[0, :], v[1, :])
-        
+
         # title and axis
         plt.title(f"t = {frame * dt:.2f}")
 
@@ -290,20 +290,20 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
 
         fig.canvas.draw()
         width, height = fig.canvas.get_width_height()
-        
+
         argb = np.frombuffer(fig.canvas.tostring_argb(), dtype=np.uint8)
         argb = argb.reshape((height, width, 4))
         frame_data = argb[:, :, 1:]
-        
+
         writer.append_data(frame_data)
         render_time += perf_counter() - render_start
-        
+
     if video_render:
         render_start = perf_counter()
 
         # create blank canvas (black background)
         img = np.zeros((frame_height, frame_width, 3), dtype=np.uint8)
-        
+
         draw_unit_grid(img, win_scale, frame_width, frame_height)
 
         for i in range(total_fish):
@@ -316,7 +316,7 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
             arrow_thickness = int(frame_scale / 300)
             cv2.arrowedLine(img, (x, y), (x_end, y_end), (50, 50, 250), arrow_thickness,
                             tipLength=0.3, line_type=cv2.LINE_AA)
-            
+
             # draw fish body
             fish_radius = int(frame_scale / 100)
             cv2.circle(img, (x, y), fish_radius, (250, 50, 50), -1, lineType=cv2.LINE_AA)
@@ -325,7 +325,7 @@ for frame in tqdm(range(frames), desc="Frames", unit="frame"):
         timestamp = f"t = {frame * dt:.2f}s"
         font_scale = int(frame_scale / 1000)
         font_thickness = int(frame_scale / 500)
-        cv2.putText(img, timestamp, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+        cv2.putText(img, timestamp, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
                     font_scale, (200, 200, 200), font_thickness, cv2.LINE_AA)
 
         # write the frame

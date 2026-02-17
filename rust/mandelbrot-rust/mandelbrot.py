@@ -97,9 +97,9 @@ def main():
         'real_range': [-1.5, 0.5], # [-1.5, 0.5]
         'imaginary_range': [-1, 1], # [-1, 1]
         # size of image in pixels
-        'image_dimensions': [1000, 1000],
+        'image_dimensions': [2000, 2000],
         # image output path
-        'output': os.path.join(os.path.dirname(__file__), './output.png'),
+        'output': os.path.join(os.path.dirname(__file__), './output_python_2000x2000.png'),
         # two colors to gradient between
         'color_1': (0, 0, 0),
         'color_2': (255, 0, 0),

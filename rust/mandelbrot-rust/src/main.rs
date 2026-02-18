@@ -1,9 +1,12 @@
 use wgpu::util::DeviceExt;
 use nannou::prelude::*;
+use std::fmt::Debug;
 use std::thread;
 use std::time::{Duration, Instant};
+use nannou_egui::{self, egui, Egui};
 
 struct Model {
+    egui: Egui,
     compute: Compute,
     params: Uniforms,
     // camera parameters (f64 for precision)
@@ -27,19 +30,50 @@ struct Compute {
 struct Uniforms {
     width: u32,
     height: u32,
+    fractal_type: u32,
+    _padding: u32,
+    julia_k: [f32; 2],
     iterations: u32,
     threshold: f32,
     real_min: f32,
     real_max: f32,
     imaginary_min: f32,
     imaginary_max: f32,
-    // packed RGB as 0xRRGGBB
-    color_1: u32,
-    color_2: u32,
-    color_fill: u32,
-    color_blend: f32,
     real_step: f32,
     imaginary_step: f32,
+    color_palette: u32,
+    color_fill: u32,
+    palette_iterations: u32, // max iterations for palette gradient
+    smooth_coloring: u32, // 0 = off, 1 = on
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum FractalType {
+    Mandelbrot,
+    BurningShip,
+    Julia,
+    Tricorn,
+    Buffalo,
+    Celtic,
+}
+
+impl Debug for FractalType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FractalType::Mandelbrot => write!(f, "Mandelbrot"),
+            FractalType::BurningShip => write!(f, "Burning Ship"),
+            FractalType::Julia => write!(f, "Julia"),
+            FractalType::Tricorn => write!(f, "Tricorn"),
+            FractalType::Buffalo => write!(f, "Buffalo"),
+            FractalType::Celtic => write!(f, "Celtic"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum ColorPalette {
+    Sinebow,
+    Rainbow,
 }
 
 fn main() {
@@ -52,19 +86,22 @@ fn main() {
 
 fn model(app: &App) -> Model {
     // initial window size
-    let width = 800;
-    let height = 600;
+    let width = 1600;
+    let height = 1000;
 
     let window_id = app.new_window()
         .size(width, height)
         .view(view)
+        .raw_event(raw_window_event)
         .build()
         .unwrap();
     let window = app.window(window_id).unwrap();
-    window.set_title("super awesome mandelbrot");
+    window.set_title("super awesome fractal renderer");
     let device = window.device();
     // vsync (doesn't work?)
     app.set_loop_mode(LoopMode::RefreshSync);
+
+    let egui = Egui::from_window(&window);
 
     // default settings
     let zoom = 1.0;
@@ -72,12 +109,11 @@ fn model(app: &App) -> Model {
     let params = Uniforms {
         width,
         height,
-        iterations: 500,
-        threshold: 1.0,
-        color_1: 0x000000, // black
-        color_2: 0xFF0000, // red
-        color_fill: 0x000000, // black
-        color_blend: 0.4,
+        fractal_type: 0,
+        _padding: 0,
+        julia_k: [0.0, 0.6],
+        iterations: 200,
+        threshold: 2.0,
         // these will be overwritten on the first frame
         real_min: 0.0,
         real_max: 0.0,
@@ -85,6 +121,11 @@ fn model(app: &App) -> Model {
         imaginary_max: 0.0,
         real_step: 0.0,
         imaginary_step: 0.0,
+        color_palette: 0,
+        color_fill: 0x000000, // black
+        palette_iterations: 200,
+        smooth_coloring: 1, // on by default
+        
     };
 
     // ---- create buffers ----
@@ -154,6 +195,7 @@ fn model(app: &App) -> Model {
     };
 
     Model {
+        egui,
         compute,
         params,
         zoom,
@@ -165,7 +207,7 @@ fn model(app: &App) -> Model {
     }
 }
 
-fn update(app: &App, model: &mut Model, _update: Update) {
+fn update(app: &App, model: &mut Model, update: Update) {
     // fps calculation
     let now = Instant::now();
     let duration = now.duration_since(model.last_frame_time);
@@ -177,6 +219,147 @@ fn update(app: &App, model: &mut Model, _update: Update) {
         model.real_fps = (model.real_fps * 0.9) + (current_fps * 0.1);
     }
 
+    let egui = &mut model.egui;
+    let params = &mut model.params;
+    egui.set_elapsed_time(update.since_start);
+    let ctx = egui.begin_frame();
+
+    let mut view_changed = false;
+
+    egui::Window::new("Settings").show(&ctx, |ui| {
+        ui.spacing_mut().slider_width = 250.0; // make sliders wider for better precision
+
+        ui.label("Fractal Type:");
+        let mut selected_fractal_type = match params.fractal_type {
+            0 => FractalType::Mandelbrot,
+            1 => FractalType::BurningShip,
+            2 => FractalType::Julia,
+            3 => FractalType::Tricorn,
+            4 => FractalType::Buffalo,
+            5 => FractalType::Celtic,
+            _ => FractalType::Mandelbrot, // default/fallback
+        };
+        let before_fractal_type = selected_fractal_type;
+        egui::ComboBox::from_id_source("fractal_type_combo")
+            .selected_text(format!("{selected_fractal_type:?}"))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut selected_fractal_type, FractalType::Mandelbrot, "Mandelbrot");
+                ui.selectable_value(&mut selected_fractal_type, FractalType::BurningShip, "Burning Ship");
+                ui.selectable_value(&mut selected_fractal_type, FractalType::Julia, "Julia");
+                ui.selectable_value(&mut selected_fractal_type, FractalType::Tricorn, "Tricorn");
+                ui.selectable_value(&mut selected_fractal_type, FractalType::Buffalo, "Buffalo");
+                ui.selectable_value(&mut selected_fractal_type, FractalType::Celtic, "Celtic");
+            }
+        );
+
+        if selected_fractal_type != before_fractal_type {
+            match selected_fractal_type {
+                FractalType::Mandelbrot => {
+                    params.fractal_type = 0;
+                    params.threshold = 2.0;
+                },
+                FractalType::BurningShip => {
+                    params.fractal_type = 1;
+                    // burning ship usually uses 4 instead of 2
+                    params.threshold = 4.0;
+                }
+                FractalType::Julia => {
+                    params.fractal_type = 2;
+                    params.threshold = 2.0;
+                }
+                FractalType::Tricorn => {
+                    params.fractal_type = 3;
+                    params.threshold = 2.0;
+                }
+                FractalType::Buffalo => {
+                    params.fractal_type = 4;
+                    params.threshold = 2.0;
+                }
+                FractalType::Celtic => {
+                    params.fractal_type = 5;
+                    params.threshold = 2.0;
+                }
+            };
+            view_changed = true;
+        }
+
+        if selected_fractal_type == FractalType::Julia {
+            ui.label("Julia Constant:");
+            let mut julia_k = [params.julia_k[0], params.julia_k[1]];
+            // fine control sliders from -2 to 2
+            view_changed |= ui.add(egui::Slider::new(&mut julia_k[0], -2.0..=2.0).text("Re")).changed();
+            view_changed |= ui.add(egui::Slider::new(&mut julia_k[1], -2.0..=2.0).text("Im")).changed();
+            if view_changed {
+                params.julia_k[0] = julia_k[0];
+                params.julia_k[1] = julia_k[1];
+            }
+        }
+
+        ui.separator();
+
+        ui.label("Iterations:");
+        view_changed |= ui.add(egui::Slider::new(&mut params.iterations, 1..=2000)).changed();
+
+        ui.label("Threshold:");
+        view_changed |= ui.add(egui::Slider::new(&mut params.threshold, 0.5..=10.0)).changed();
+
+        ui.separator();
+
+        ui.label("Color Palette:");
+        let mut selected_color_palette = match params.color_palette {
+            0 => ColorPalette::Sinebow,
+            1 => ColorPalette::Rainbow,
+            _ => ColorPalette::Sinebow, // default/fallback
+        };
+        let before_color_palette = selected_color_palette;
+        egui::ComboBox::from_id_source("color_palette_combo")
+            .selected_text(format!("{selected_color_palette:?}"))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut selected_color_palette, ColorPalette::Sinebow, "Sinebow");
+                ui.selectable_value(&mut selected_color_palette, ColorPalette::Rainbow, "Rainbow");
+            }
+        );
+
+        if selected_color_palette != before_color_palette {
+            match selected_color_palette {
+                ColorPalette::Sinebow => params.color_palette = 0,
+                ColorPalette::Rainbow => params.color_palette = 1,
+            };
+            view_changed = true;
+        }
+
+        ui.label("Smooth Coloring:");
+        let mut smooth_coloring = params.smooth_coloring == 1;
+        if ui.checkbox(&mut smooth_coloring, "").changed() {
+            params.smooth_coloring = if smooth_coloring { 1 } else { 0 };
+            view_changed = true;
+        }
+
+        ui.label("Palette Iterations:");
+        view_changed |= ui.add(egui::Slider::new(&mut params.palette_iterations, 0..=2000)).changed();
+
+        ui.label("Fill Color:");
+        let mut fill_color = to_rgb_f32(params.color_fill);
+
+        if egui::color_picker::color_edit_button_rgb(ui, &mut fill_color).changed() {
+            params.color_fill = to_rgb_u32(fill_color);
+            view_changed = true;
+        }
+
+        let clicked = ui.button("Reset Settings").clicked();
+
+        if clicked {
+            params.iterations = 200;
+            params.threshold = 2.0;
+            params.palette_iterations = 200;
+            params.color_fill = 0x000000;
+            model.center_real = -0.5;
+            model.center_imaginary = 0.0;
+            model.zoom = 1.0;
+            view_changed = true;
+        }
+    });
+
     // precalculate zoom & scale
     // zoom is exponential: each +1 doubles the zoom level, each -1 halves it
     // zoom - 1 so that the default zoom (1.0) corresponds to a real_zoom of 1.0 (no zoom)
@@ -184,7 +367,6 @@ fn update(app: &App, model: &mut Model, _update: Update) {
     let base_step = 0.005; // magic number; adjust for base zoom
     let current_step = base_step / real_zoom; // step size decreases as we zoom in
 
-    let mut view_changed = false;
     let mut zoom_speed = 0.01;
     let move_speed_px = 4.0; // base pixels/frame speed
     let mut move_delta = move_speed_px * current_step;
@@ -273,8 +455,7 @@ fn update(app: &App, model: &mut Model, _update: Update) {
         view_changed = true;
     }
 
-    // only calculate and render if the view changed at all
-    // eg. window resize, zoom
+    // only calculate and render if the view changed at all (window resize, zoom, parameter change, etc)
     if view_changed {
         // calculate view bounds based on current window size
         // this ensures a consistent visual scale regardless of window dimensions
@@ -289,13 +470,6 @@ fn update(app: &App, model: &mut Model, _update: Update) {
 
         model.params.real_step = current_step as f32;
         model.params.imaginary_step = current_step as f32;
-
-        // println!("View changed: zoom={}, center=({}, {}), size={}x{}, bounds=({}r to {}r, {}i to {}i)", 
-        //     model.zoom, model.center_real,
-        //     model.center_imaginary,win_w, win_h,
-        //     model.params.real_min, model.params.real_max,
-        //     model.params.imaginary_min, model.params.imaginary_max
-        // );
 
         // we overwrite the buffer instead of creating a new one
         window.queue().write_buffer(&model.compute.uniform_buffer, 0, bytemuck::bytes_of(&model.params));
@@ -334,17 +508,39 @@ fn view(app: &App, model: &Model, frame: Frame) {
     // fps counter
     let fps_display = model.real_fps;
     let fps_text = format!("FPS: {fps_display:.0}");
-    // .xy() sets position relative to center (window coordinates)
-    // top left is roughly (-width/2, +height/2)
+    
     let win = app.window_rect();
     draw.text(&fps_text)
         .font_size(24)
         .color(WHITE)
-        .xy(win.top_left() + vec2(80.0, -30.0));
+        .xy(win.bottom_left() + vec2(50.0, 30.0));
 
     draw.to_frame(app, &frame).unwrap();
+    model.egui.draw_to_frame(&frame).unwrap();
 }
 
 fn event(_app: &App, _model: &mut Model, _event: Event) {
     // TODO mouse movement?
+}
+
+fn raw_window_event(_app: &App, model: &mut Model, event: &nannou::winit::event::WindowEvent) {
+    // let egui handle things like keyboard and mouse input
+    model.egui.handle_raw_event(event);
+}
+
+
+fn to_rgb_f32(color: u32) -> [f32; 3] {
+    // convert packed RGB u32 (0xRRGGBB) to [f32; 3] with values in [0, 1]
+    [
+        ((color >> 16) & 0xFF) as f32 / 255.0,
+        ((color >> 8) & 0xFF) as f32 / 255.0,
+        (color & 0xFF) as f32 / 255.0,
+    ]
+}
+
+fn to_rgb_u32(rgb: [f32; 3]) -> u32 {
+    // convert [f32; 3] with values in [0, 1] to packed RGB u32 (0xRRGGBB)
+    ((rgb[0] * 255.0) as u32) << 16
+    | ((rgb[1] * 255.0) as u32) << 8
+    | ((rgb[2] * 255.0) as u32)
 }

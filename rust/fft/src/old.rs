@@ -61,14 +61,14 @@ fn main() -> Result<(), hound::Error> {
     let path = "sstv_signal(2).wav"; // audio file path
 
     // -------- rodio playback
-    let stream_handle = rodio::OutputStreamBuilder::open_default_stream()
+    let stream_handle = rodio::DevicePlayerBuilder::open_default_player()
         .expect("open default audio stream");
-    let sink = rodio::Sink::connect_new(stream_handle.mixer());
+    let player = rodio::Player::connect_new(stream_handle.mixer());
     let file = File::open(path).expect("Failed to open audio file");
     let source = Decoder::try_from(file).unwrap();
-    sink.pause();
-    sink.append(source);
-    sink.set_volume(0.02);
+    player.pause();
+    player.append(source);
+    player.set_volume(0.02);
 
     // -------- hound wav reading
     let mut reader = hound::WavReader::open(path)?;
@@ -198,11 +198,11 @@ fn main() -> Result<(), hound::Error> {
     let mut handle = BufWriter::new(stdout.lock());
     let spacer_line = " ".repeat(w_waveform);
 
-    sink.play();
+    player.play();
 
     loop {
         // current_time = start_time.elapsed().as_millis();
-        current_time = sink.get_pos().as_millis();
+        current_time = player.get_pos().as_millis();
         if current_time >= end_time {
             break;
         }

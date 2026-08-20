@@ -1,5 +1,14 @@
-#![allow(unused)]
+// #![allow(unused)]
 
+/* how to use
+set the below constants
+*/
+
+const STARTING_MINES: u32 = 50; // how many mines in the board
+const GRID_SIZE_CELLS: [u32; 2] = [30, 16]; // how many cells, (w, h)
+const CORNERS_PX: [u32; 4] = [718, 503, 2134, 1405]; // TL/BR corners of OUTER board exclusive, in px from top left (matches paint.net)
+const INNER_BOARD_CORNER_PX: [u32; 2] = [751, 655]; // pixel position of TL cell's TL corner
+const CELL_SIZE_PX: u32 = 45; // width/height of one cell in px
 use fs_extra::dir;
 use core::time;
 use std::{array, iter::FlatMap, os, process::exit, time::{Duration, Instant}};
@@ -13,8 +22,8 @@ use rand::Rng;
 
 /*  COLORS (for display)
 closed = 4C545C (DCDCDC)
-flagged = D8E0E8 (F75656)
-mine = 7B7B7B (FF3333)
+flagged = D8E0E8/B0B8C1 (F75656)
+mine = 7B7B7B/969696 (FF3333)
 0/open = 384048
 1 = 7CC7FF (blue)
 2 = 66C266 (green)
@@ -31,7 +40,9 @@ fn normalized(filename: String) -> String {
 }
 
 fn wait(millis: u64) {
-    thread::sleep(Duration::from_millis(millis));
+    if millis > 0 {
+        thread::sleep(Duration::from_millis(millis));
+    }
 }
 
 fn rgb_to_hex(r: u8, g: u8, b: u8) -> String {
@@ -71,7 +82,9 @@ fn color_to_state(color: &str) -> Option<(State, u8)> {
     match color {
         "4C545C" => {Some((State::Closed, 0))}
         "D8E0E8" => {Some((State::Flagged, 0))}
+        "B0B8C1" => {Some((State::Flagged, 0))}
         "7B7B7B" => {Some((State::Mine, 0))}
+        "969696" => {Some((State::Mine, 0))}
         "384048" => {Some((State::Open, 0))}
         "7CC7FF" => {Some((State::Open, 1))}
         "66C266" => {Some((State::Open, 2))}
@@ -251,13 +264,21 @@ impl Board {
         if let Some(position) = position {
             let res = self.rag.move_mouse_to_pos(position[0], position[1], 0.0);
             match res {
-                Ok(value) => {
-                    self.rag.left_click();
-                    wait(50);
+                Ok(_value) => {
+                    let res = self.rag.left_click();
+                    match res {
+                        Ok(_value) => {
+                            wait(50);
+                        }
+                        Err(error) => {
+                            println!("left click mouse error: {error}");
+                            exit(1);
+                        }
+                    }
                 }
                 Err(error) => {
                     println!("move mouse error: {error}");
-                    exit(0);
+                    exit(1);
                 }
             }
 
@@ -269,9 +290,26 @@ impl Board {
         if let Some(position) = position {
             self.set_cell_state(x, y, State::Flagged);
             self.set_cell_solved(x, y, true);
-            self.mines_left -= 1;
-            self.rag.move_mouse_to_pos(position[0], position[1], 0.0);
-            self.rag.right_click();
+            self.mines_left = self.mines_left.saturating_sub(1);
+            let res = self.rag.move_mouse_to_pos(position[0], position[1], 0.0);
+            match res {
+                Ok(_value) => {
+                    let res = self.rag.right_click();
+                    match res {
+                        Ok(_value) => {
+                            wait(50);
+                        }
+                        Err(error) => {
+                            println!("right click mouse error: {error}");
+                            exit(1);
+                        }
+                    }
+                }
+                Err(error) => {
+                    println!("move mouse error: {error}");
+                    exit(1);
+                }
+            }
             wait(50);
         }
     }
@@ -289,7 +327,7 @@ impl Board {
             (x-1, y+1), (x, y+1), (x+1, y+1),
         ];
 
-        if let Some(cell) = self.cells.get(&(x, y)) {
+        if let Some(_cell) = self.cells.get(&(x, y)) {
             for pos in spots {
                 if let Some(surrounding_cell) = self.cells.get(&pos) {
                     cells.push(surrounding_cell);
@@ -380,6 +418,9 @@ impl Cell {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    unsafe { // fix dpi messing up pixel coordinates
+        windows_sys::Win32::UI::WindowsAndMessaging::SetProcessDPIAware();
+    }
     // seperate thread to listen for "Q" to quit immediately
     thread::spawn(|| {
         if let Err(error) = listen(move |event| {
@@ -400,7 +441,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\r                 ");
 
     let start = Instant::now();
-    let mut rag = RustAutoGui::new(false)?;
+    let rag = RustAutoGui::new(false)?;
     let mut rng = rand::rng();
 
     let monitors = Monitor::all()?;
@@ -412,13 +453,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut board = Board {
         // corners: [980, 251, 1400, 774],
-        corners: [1173, 308, 2433, 1111],
+        corners: CORNERS_PX,
         // inner_board_corner: [1010, 386],
-        inner_board_corner: [1203, 443],
-        cell_size: 40,
-        grid_size: [30, 16],
-        mines: 50,
-        mines_left: 50,
+        inner_board_corner: INNER_BOARD_CORNER_PX,
+        cell_size: CELL_SIZE_PX,
+        grid_size: GRID_SIZE_CELLS,
+        mines: STARTING_MINES,
+        mines_left: STARTING_MINES,
         cells: HashMap::new(),
         rag,
         monitor,
@@ -441,12 +482,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     board.display_board("Setting up");
 
     // ################ MAIN LOGIC LOOP ################
-    let mut step_limit = 500;
-    let wait_time = 500;
+    let step_limit = 10000;
+    let wait_time_step = 0;
+    let wait_time_click = 0;
     let mut is_new = true;
     let mut should_update = true;
     let mut stuck_tries = 0; // loops before clicking random cell
-    wait(wait_time);
+    let debug_screenshots = false; // save screenshots to disk
+    wait(wait_time_step);
     'main: loop {
         board.steps += 1;
         if board.steps > step_limit {
@@ -456,7 +499,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if should_update {
             should_update = false;
             board.display_board("Capturing screen");
-            wait(wait_time);
+            wait(wait_time_step);
             // ######## get current game state
             let image = board.monitor.capture_region(
                 board.corners[0],
@@ -465,21 +508,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 capture_height
             )?;
 
-            // println!(
-            //     "> captured region {}x{} at ({}, {})",
-            //     image.width(),
-            //     image.height(),
-            //     board.corners[0],
-            //     board.corners[1],
-            // );
-
-            image.save(format!(
-                "screenshots/monitor-{}-region.png",
-                normalized(board.monitor.name()?) 
-            ))?;
+            if debug_screenshots {
+                image.save(format!(
+                    "screenshots/monitor-{}-region.png",
+                    normalized(board.monitor.name()?) 
+                ))?;
+            }
 
             board.display_board("Updating board");
-            wait(wait_time);
+            wait(wait_time_step);
             // ######## update board (if needed)
             for x in x_range.clone() {
                 for y in y_range.clone() {
@@ -498,7 +535,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let color = rgb_to_hex(pixel[0], pixel[1], pixel[2]);
                         if &color == "66DD66" {
                             board.display_board(&format!("No guess mode: Clicking first cell ({x}, {y})"));
-                            wait(wait_time);
+                            wait(wait_time_click);
                             board.open_cell(x, y);
                             continue 'main;
                         }
@@ -514,12 +551,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             if state == State::Flagged {
                                 board.set_cell_solved(x, y, true);
-                                board.mines_left -= 1;
+                                board.mines_left = board.mines_left.saturating_sub(1);
                             }
                             board.set_cell(x, y, state, value);
                         } else {
                             println!("unknown color! cell ({}, {}) color={}", x, y, color_text(&color, &color));
-                            exit(0)
+                            exit(1)
                         }
                     }
                 }
@@ -532,7 +569,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(state) = board.get_cell_state(x, y) && state == State::Mine {
                     board.state = BoardState::Failed;
                     board.display_board("Board failed! D:");
-                    wait(wait_time);
+                    wait(wait_time_step);
                     break 'main;
                 }
             }
@@ -541,11 +578,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // ######## if board is new, click random cell
         if is_new {
             board.display_board("Picking first cell");
-            wait(wait_time);
+            wait(wait_time_step);
             let rand_x = rng.random_range(1..=board.grid_size[0]);
             let rand_y = rng.random_range(1..=board.grid_size[1]);
             board.display_board(&format!("Clicking cell ({rand_x}, {rand_y})"));
-            wait(wait_time);
+            wait(wait_time_click);
             board.open_cell(rand_x, rand_y);
             should_update = true;
             continue 'main;
@@ -553,7 +590,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // ######## check for guaranteed mines or easy safe opens
         board.display_board("Checking surrounding tiles");
-        wait(wait_time);
+        wait(wait_time_step);
         for x in x_range.clone() {
             for y in y_range.clone() {
                 if let Some(solved) = board.get_cell_solved(x, y) && solved {
@@ -582,13 +619,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if !closed.is_empty() {
                             let cell = closed[0];
                             board.display_board(&format!("Opening cell ({},{}) from ({},{})", cell.x, cell.y, x, y));
-                            wait(wait_time);
+                            wait(wait_time_click);
                             board.open_cell(cell.x, cell.y);
                             should_update = true;
                             continue 'main;
                         }
                         board.display_board(&format!("Marking cell ({x},{y}) solved: All surrounding mines flagged"));
-                        wait(wait_time);
+                        wait(wait_time_step);
                         board.set_cell_solved(x, y, true);
                         continue 'main;
                     }
@@ -597,7 +634,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // surrounding unopened tiles match mine count; flag cells
                         let cell = closed[0];
                         board.display_board(&format!("Flagging cell ({},{}) from ({},{})", cell.x, cell.y, x, y));
-                        wait(wait_time);
+                        wait(wait_time_click);
                         board.flag_cell(cell.x, cell.y);
                         continue 'main;
                     }
@@ -618,22 +655,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if board_solved {
             board.state = BoardState::Solved;
             board.display_board("Board solved! :D");
-            wait(wait_time);
+            wait(wait_time_step);
             break 'main;
         }
 
         if stuck_tries >= 3 {
             // ######## nothing else to do, click random cell
             board.display_board("I'm stuck! Picking random cell");
-            wait(wait_time);
+            wait(wait_time_step);
             'random: loop {
                 let rand_x = rng.random_range(1..=board.grid_size[0]);
                 let rand_y = rng.random_range(1..=board.grid_size[1]);
                 if let Some(state) = board.get_cell_state(rand_x, rand_y) && state == State::Closed {
                     board.display_board(&format!("Clicking cell ({rand_x}, {rand_y})"));
-                    wait(wait_time);
+                    wait(wait_time_click);
                     board.open_cell(rand_x, rand_y);
-                    should_update = true;
+                    stuck_tries = 0;
                     break 'random;
                 }
             }
@@ -642,76 +679,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         stuck_tries += 1;
         should_update = true;
     }
-
-    // for cell in board.cells.values() {
-    //     println!("cell ({}, {}) is {:?}, value: {}", cell.x, cell.y, cell.state, cell.value);
-    // }
-
-    // board.set_cell(2, 2, State::Open, 2);
-    // board.set_cell(3, 2, State::Open, 1);
-    // board.set_cell(4, 2, State::Open, 3);
-    // board.set_cell(6, 2, State::Open, 3);
-    // board.set_cell(7, 2, State::Open, 2);
-    // board.set_cell(8, 2, State::Open, 3);
-    // board.set_cell(2, 3, State::Open, 1);
-    // board.set_cell(4, 3, State::Open, 1);
-    // board.set_cell(5, 3, State::Open, 1);
-    // board.set_cell(6, 3, State::Open, 1);
-    // board.set_cell(8, 3, State::Open, 1);
-    // board.set_cell(1, 4, State::Open, 1);
-    // board.set_cell(2, 4, State::Open, 1);
-    // board.set_cell(8, 4, State::Open, 1);
-    // board.set_cell(7, 5, State::Open, 1);
-    // board.set_cell(8, 5, State::Open, 2);
-    // board.set_cell(1, 6, State::Open, 2);
-    // board.set_cell(2, 6, State::Open, 1);
-    // board.set_cell(6, 6, State::Open, 1);
-    // board.set_cell(7, 6, State::Open, 2);
-    // board.set_cell(2, 7, State::Open, 1);
-    // board.set_cell(4, 7, State::Open, 1);
-    // board.set_cell(5, 7, State::Open, 1);
-    // board.set_cell(6, 7, State::Open, 2);
-    // board.set_cell(1, 8, State::Open, 2);
-    // board.set_cell(2, 8, State::Open, 1);
-    // board.set_cell(4, 8, State::Open, 1);
-    // board.set_cell(4, 9, State::Open, 1);
-
-    // board.set_cell(3, 3, State::Open, 0);
-    // board.set_cell(7, 3, State::Open, 0);
-    // board.set_cell(3, 4, State::Open, 0);
-    // board.set_cell(4, 4, State::Open, 0);
-    // board.set_cell(5, 4, State::Open, 0);
-    // board.set_cell(6, 4, State::Open, 0);
-    // board.set_cell(7, 4, State::Open, 0);
-    // board.set_cell(1, 5, State::Open, 0);
-    // board.set_cell(2, 5, State::Open, 0);
-    // board.set_cell(3, 5, State::Open, 0);
-    // board.set_cell(4, 5, State::Open, 0);
-    // board.set_cell(5, 5, State::Open, 0);
-    // board.set_cell(6, 5, State::Open, 0);
-    // board.set_cell(3, 6, State::Open, 0);
-    // board.set_cell(4, 6, State::Open, 0);
-    // board.set_cell(5, 6, State::Open, 0);
-    // board.set_cell(3, 7, State::Open, 0);
-    // board.set_cell(3, 8, State::Open, 0);
-    // board.set_cell(1, 9, State::Open, 0);
-    // board.set_cell(2, 9, State::Open, 0);
-    // board.set_cell(3, 9, State::Open, 0);
-    
-    // board.set_cell(1, 7, State::Mine, 0);
-
-    // board.open_cell(9, 9);
-    // board.open_cell(8, 9);
-    // board.open_cell(7, 9);
-    // board.open_cell(6, 9);
-    // board.open_cell(5, 9);
-    // board.open_cell(4, 9);
-    // board.open_cell(3, 9);
-    // board.open_cell(2, 9);
-    // board.open_cell(1, 9);
-
-    // let mouse_pos = board.rag.get_mouse_position()?;
-    // println!("mouse position: ({}, {})", mouse_pos.0, mouse_pos.1);
 
     println!("\nruntime: {:?}\nsteps: {}", start.elapsed(), board.steps);
 

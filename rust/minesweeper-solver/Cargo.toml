@@ -9,3 +9,4 @@ rand = "0.9.2"
 rdev = "0.5.3"
 rustautogui = "2.5.0"
 xcap = "0.7.0"
+windows-sys = { version = "0.61.2", features = ["Win32_UI_WindowsAndMessaging"] }

@@ -1,0 +1,131 @@
+[gd_scene format=3 uid="uid://5duck310cga5"]
+
+[ext_resource type="Texture2D" uid="uid://c5525qkajaf80" path="res://assets/checker_512x512/checker_lime_512x512.png" id="1_ig7tw"]
+[ext_resource type="Texture2D" uid="uid://b1eyyr1tt8lt8" path="res://assets/checker_512x512/checker_pink_512x512.png" id="2_0xm2m"]
+[ext_resource type="Texture2D" uid="uid://dxw6pmomsja8f" path="res://assets/checker_512x512/checker_red_512x512.png" id="3_h2yge"]
+[ext_resource type="Script" uid="uid://cek2qnix3oim2" path="res://viewpoint.gd" id="4_lquwl"]
+[ext_resource type="Texture2D" uid="uid://gv6pk70k0b67" path="res://assets/checker_512x512/checker_black_512x512.png" id="5_7mycd"]
+[ext_resource type="Script" uid="uid://cd1iwigpugvwb" path="res://debug_drawer.gd" id="6_7mycd"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_h2yge"]
+sky_top_color = Color(0.3247198, 0.48427767, 1, 1)
+sky_horizon_color = Color(0.819738, 0.9318803, 1.1313173, 1)
+ground_bottom_color = Color(0.116026126, 0.40503773, 0.6870633, 1)
+ground_horizon_color = Color(0.819738, 0.9318803, 1.1313173, 1)
+
+[sub_resource type="Sky" id="Sky_1bvp3"]
+sky_material = SubResource("ProceduralSkyMaterial_h2yge")
+
+[sub_resource type="Environment" id="Environment_lquwl"]
+background_mode = 2
+sky = SubResource("Sky_1bvp3")
+tonemap_mode = 2
+ssao_enabled = true
+sdfgi_enabled = true
+glow_enabled = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h2yge"]
+albedo_texture = ExtResource("2_0xm2m")
+uv1_scale = Vector3(0.25, 0.25, 0.25)
+uv1_triplanar = true
+uv1_world_triplanar = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_1bvp3"]
+material = SubResource("StandardMaterial3D_h2yge")
+size = Vector3(0.2, 0.2, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1bvp3"]
+albedo_texture = ExtResource("3_h2yge")
+uv1_triplanar = true
+
+[sub_resource type="SphereMesh" id="SphereMesh_lquwl"]
+material = SubResource("StandardMaterial3D_1bvp3")
+radius = 0.2
+height = 0.4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0xm2m"]
+albedo_texture = ExtResource("1_ig7tw")
+uv1_scale = Vector3(0.4, 0.4, 0.4)
+uv1_triplanar = true
+uv1_world_triplanar = true
+texture_filter = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_h2yge"]
+material = SubResource("StandardMaterial3D_0xm2m")
+size = Vector3(20, 1, 20)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_272bh"]
+albedo_color = Color(0, 0, 0, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_5vw27"]
+material = SubResource("StandardMaterial3D_272bh")
+radius = 0.01
+height = 0.02
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kek77"]
+albedo_texture = ExtResource("5_7mycd")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lquwl"]
+shading_mode = 0
+vertex_color_use_as_albedo = true
+
+[sub_resource type="ImmediateMesh" id="ImmediateMesh_7mycd"]
+
+[node name="Main" type="Node3D" unique_id=1226249156]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1122081364]
+transform = Transform3D(0.91068375, -0.2731907, 0.30987403, 0, 0.75011104, 0.66131186, -0.4131042, -0.602246, 0.68311393, 0, 0, 0)
+light_color = Color(1, 1, 0.4509804, 1)
+light_energy = 1.2
+shadow_enabled = true
+directional_shadow_max_distance = 500.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1112025531]
+environment = SubResource("Environment_lquwl")
+
+[node name="Objects" type="Node3D" parent="." unique_id=77041394]
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="Objects" unique_id=658803854]
+transform = Transform3D(0.9576719, 0, 0.287862, 0, 1, 0, -0.287862, 0, 0.9576719, 0.34846961, 0.6046134, 5.5640545)
+mesh = SubResource("BoxMesh_1bvp3")
+
+[node name="MeshInstance3D3" type="MeshInstance3D" parent="Objects" unique_id=1839003583]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3753338, 0.88234806, 6.0760555)
+mesh = SubResource("SphereMesh_lquwl")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Objects" unique_id=1258234859]
+mesh = SubResource("BoxMesh_h2yge")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=946263352]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, -0.056792498, 2.414195, 7.232479)
+projection = 1
+
+[node name="Viewpoint" type="CharacterBody3D" parent="." unique_id=425243633 node_paths=PackedStringArray("window", "debug_drawer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 7.2)
+script = ExtResource("4_lquwl")
+sprint_speed = 1.0
+window = NodePath("../Screen/Window")
+debug_drawer = NodePath("../DebugDrawer")
+
+[node name="Head" type="MeshInstance3D" parent="Viewpoint" unique_id=997786015]
+mesh = SubResource("SphereMesh_5vw27")
+
+[node name="Camera" type="Camera3D" parent="Viewpoint" unique_id=1089024321]
+projection = 2
+current = true
+size = 0.001
+
+[node name="Screen" type="CSGBox3D" parent="." unique_id=540609004]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9209106, 7)
+visible = false
+size = Vector3(0.385, 0.235, 0.1)
+material = SubResource("StandardMaterial3D_kek77")
+
+[node name="Window" type="CSGBox3D" parent="Screen" unique_id=1753176925]
+operation = 2
+size = Vector3(0.345, 0.195, 0.1)
+
+[node name="DebugDrawer" type="MeshInstance3D" parent="." unique_id=1583219389]
+material_override = SubResource("StandardMaterial3D_lquwl")
+mesh = SubResource("ImmediateMesh_7mycd")
+script = ExtResource("6_7mycd")
